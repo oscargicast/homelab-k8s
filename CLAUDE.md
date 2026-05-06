@@ -80,7 +80,8 @@ homelab-k8s/
 ├── infrastructure/
 │   ├── namespaces/                     # Namespace CRs
 │   ├── sealed-secrets/application.yaml # Sealed Secrets operator
-│   └── cloudnative-pg/application.yaml # CNPG operator
+│   ├── cloudnative-pg/application.yaml # CNPG operator
+│   └── traefik/application.yaml        # Traefik ingress controller
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
 │   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
@@ -100,6 +101,7 @@ homelab-k8s/
 | `cnpg-system` | CloudNativePG operator |
 | `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
+| `traefik` | Traefik ingress controller |
 | `automation` | n8n |
 | `homelab` | Homepage dashboard |
 
@@ -112,6 +114,7 @@ homelab-k8s/
 | CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.28.*` |
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
 | Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
+| Traefik | `https://helm.traefik.io/traefik` | `traefik` | `40.0.0` |
 | n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `2.0.1` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
 
@@ -130,13 +133,17 @@ homelab-k8s/
 
 | Chart | Gotcha |
 |---|---|
+| **Traefik 40.x (v3)** | `ingressClass.fallbackApiVersion: v1` was removed in v3 — delete it or the chart fails to render. |
+| **Traefik 40.x (v3)** | `ports.web.redirectTo` was removed in v3 — use `redirections` block instead, or remove entirely. |
 | **n8n 2.0.1** | All config moves under `main:` key — `config`, `extraEnv`, `persistence`, `resources` all nested under `main`. |
 | **n8n 2.0.1** | Use `main.extraEnv` with `valueFrom.secretKeyRef` to inject secrets (no more `extraEnvSecrets`). |
 | **n8n 2.0.1** | `persistence.type: dynamic` is required to bind a PVC — must be under `main.persistence`. |
 | **n8n 2.0.1** | Ingress paths require explicit `pathType: Prefix` (previously hardcoded). |
 | **n8n 2.0.1** | n8n chart uses OCI (`oci://8gears.container-registry.com/library/n8n`); the old HTTP chartrepo returns HTML. |
-| **homepage 1.x** | `serviceAccount.create: true` must be set explicitly — omitting it leaves the SA missing and pods fail to schedule. |
-| **homepage 1.x** | `persistence` block at root level is incompatible with bjw-s/common v1. Remove it; config is managed via the `config:` section. |
+| **n8n 2.0.1** | Set `N8N_SECURE_COOKIE=false` in `main.extraEnv` for HTTP access — n8n v1.100+ defaults to `true` and blocks login over plain HTTP. |
+| **n8n 2.0.1** | Serving n8n at a subpath (e.g. `/n8n/`) requires a Traefik StripPrefix middleware; without it, static assets return `text/html` 404s. |
+| **homepage 2.x** | `enableRbac: true` must be set explicitly for the kubernetes widget to work. |
+| **homepage 2.x** | `HOMEPAGE_ALLOWED_HOSTS` env var is required when accessed via a non-standard port (e.g. `oscar-mini-m1.tail90f0a7.ts.net:8080`). |
 | **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
 | **loki 6.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
 
@@ -170,9 +177,9 @@ kubectl port-forward -n <namespace> svc/<service> --address 0.0.0.0 <local>:<rem
 ## Argo CD Access
 
 ```bash
-# On Mac mini:
-kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8080:443
-# Open: https://<tailscale-ip>:8080
+# On Mac mini (port 8080 is used by Traefik):
+kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
+# Open: https://<tailscale-ip>:8443
 # User: admin
 # Pass: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```

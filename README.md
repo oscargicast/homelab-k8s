@@ -13,6 +13,7 @@ MacBook Pro
                           ├── CloudNativePG    ← operador PostgreSQL
                           ├── PostgreSQL       ← postgres-lab + n8n-postgres
                           ├── Prometheus + Grafana + Loki ← observabilidad
+                          ├── Traefik          ← ingress controller
                           ├── n8n              ← automatización de workflows
                           └── Homepage         ← dashboard del homelab
 ```
@@ -43,6 +44,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | n8n-postgres | PostgreSQL dedicado para n8n | `databases` |
 | kube-prometheus-stack | Métricas (Prometheus + Grafana) | `observability` |
 | Loki | Logs centralizados | `observability` |
+| Traefik | Ingress controller (routing por path) | `traefik` |
 | n8n | Automatización de workflows | `automation` |
 | Homepage | Dashboard visual del homelab | `homelab` |
 
@@ -104,13 +106,28 @@ kubeseal --fetch-cert \
 kubectl apply -f bootstrap/argocd/root-app.yaml
 ```
 
-## Acceder a Argo CD
+## Acceder a los servicios
+
+Todos los servicios se sirven a través de Traefik en un único punto de entrada:
 
 ```bash
 # Port-forward desde Mac mini:
-kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8080:443
+kubectl port-forward -n traefik svc/traefik --address 0.0.0.0 8080:80
 
-# Abrir: https://<tailscale-ip>:8080
+# Servicios disponibles en http://oscar-mini-m1.tail90f0a7.ts.net:8080/
+# - Homepage:   /
+# - Grafana:    /grafana
+# - Prometheus: /prometheus
+# - n8n:        /n8n/
+```
+
+## Acceder a Argo CD
+
+```bash
+# Port-forward desde Mac mini (puerto 8080 lo usa Traefik):
+kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
+
+# Abrir: https://<tailscale-ip>:8443
 # Usuario: admin
 # Contraseña:
 kubectl -n argocd get secret argocd-initial-admin-secret \
