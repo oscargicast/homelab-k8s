@@ -1,0 +1,6 @@
+# Nunca commitear secrets en plaintext
+**/secret.yaml
+**/secrets.yaml
+
+# Los SealedSecrets SÍ van a git (encriptados)
+# **/sealed-secret.yaml  ← estos son seguros para commitear

@@ -1,0 +1,30 @@
+replicaCount: 1
+
+config:
+  database:
+    type: postgresdb
+    postgresdb:
+      host: "n8n-postgres-rw.databases.svc.cluster.local"
+      port: 5432
+      database: n8n
+      user: n8n
+      # La contraseña se inyecta via Secret creado por Sealed Secrets
+      # Si el chart n8n no lo soporta directamente, montar el Secret como env var
+      schema: public
+
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 5Gi
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+service:
+  type: ClusterIP
+  port: 5678

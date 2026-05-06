@@ -1,0 +1,50 @@
+replicaCount: 1
+
+image:
+  tag: latest
+
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 1Gi
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 10m
+  limits:
+    memory: 128Mi
+    cpu: 100m
+
+config:
+  bookmarks:
+    - Observabilidad:
+        - Grafana:
+            - href: "http://grafana.homelab.local"
+              description: Métricas y logs
+        - Prometheus:
+            - href: "http://prometheus.homelab.local"
+              description: Prometheus UI
+  services:
+    - Automatización:
+        - n8n:
+            href: "http://n8n.homelab.local"
+            description: Workflows
+            icon: n8n.png
+    - Databases:
+        - CloudNativePG:
+            href: "https://cloudnative-pg.io"
+            description: PostgreSQL operator
+  widgets:
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: mac-mini
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
