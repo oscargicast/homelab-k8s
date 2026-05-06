@@ -1,5 +1,7 @@
 replicaCount: 1
 
+enableRbac: true
+
 serviceAccount:
   create: true
 
@@ -41,12 +43,15 @@ config:
             href: "https://cloudnative-pg.io"
             description: PostgreSQL operator
   widgets:
-    - greeting:
-        text_size: xl
-        text: "Homelab"
-    - datetime:
-        text_size: l
-        format:
-          dateStyle: long
-          timeStyle: short
-          hourCycle: h23
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: "homelab"
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true

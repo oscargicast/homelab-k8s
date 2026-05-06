@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://helm.traefik.io/traefik
     chart: traefik
-    targetRevision: "27.*"
+    targetRevision: "40.0.0"
     helm:
       values: |
         service:
@@ -21,7 +21,6 @@ spec:
         ingressClass:
           enabled: true
           isDefaultClass: true
-          fallbackApiVersion: v1
 
         deployment:
           replicas: 1
