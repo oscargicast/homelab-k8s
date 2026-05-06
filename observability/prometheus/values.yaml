@@ -21,7 +21,7 @@ grafana:
     pathType: Prefix
   grafana.ini:
     server:
-      root_url: "%(protocol)s://%(domain)s/grafana"
+      root_url: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana"
       serve_from_sub_path: true
 
 prometheus:
@@ -34,7 +34,7 @@ prometheus:
       - /prometheus
     pathType: Prefix
   prometheusSpec:
-    externalUrl: "http://oscar-mini-m1.tail90f0a7.ts.net/prometheus"
+    externalUrl: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/prometheus"
     routePrefix: /prometheus
     retention: 3d
     retentionSize: "8GB"

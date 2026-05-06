@@ -25,15 +25,15 @@ config:
   bookmarks:
     - Observabilidad:
         - Grafana:
-            - href: "http://oscar-mini-m1.tail90f0a7.ts.net/grafana"
+            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana"
               description: Métricas y logs
         - Prometheus:
-            - href: "http://oscar-mini-m1.tail90f0a7.ts.net/prometheus"
+            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/prometheus"
               description: Prometheus UI
   services:
     - Automatización:
         - n8n:
-            href: "http://oscar-mini-m1.tail90f0a7.ts.net/n8n/"
+            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
             description: Workflows
             icon: n8n.png
     - Databases:

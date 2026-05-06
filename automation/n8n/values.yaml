@@ -44,4 +44,4 @@ ingress:
 
 extraEnv:
   N8N_PATH: "/n8n/"
-  N8N_EDITOR_BASE_URL: "http://oscar-mini-m1.tail90f0a7.ts.net/n8n/"
+  N8N_EDITOR_BASE_URL: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
