@@ -112,8 +112,8 @@ homelab-k8s/
 | CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.28.*` |
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
 | Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
-| n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `0.25.0` |
-| Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `1.*` |
+| n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `2.0.1` |
+| Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
 
 ## Architecture Constraints
 
@@ -130,9 +130,11 @@ homelab-k8s/
 
 | Chart | Gotcha |
 |---|---|
-| **n8n 0.25.0** | Use `extraEnvSecrets` (not `extraEnv`) to inject secret values. `extraEnv` only supports plain string values. |
-| **n8n 0.25.0** | `persistence.type: dynamic` is required to bind a PVC — `enabled: true` alone leaves the pod on emptyDir. |
-| **n8n 0.25.0** | n8n chart uses OCI (`oci://8gears.container-registry.com/library/n8n`); the old HTTP chartrepo returns HTML. |
+| **n8n 2.0.1** | All config moves under `main:` key — `config`, `extraEnv`, `persistence`, `resources` all nested under `main`. |
+| **n8n 2.0.1** | Use `main.extraEnv` with `valueFrom.secretKeyRef` to inject secrets (no more `extraEnvSecrets`). |
+| **n8n 2.0.1** | `persistence.type: dynamic` is required to bind a PVC — must be under `main.persistence`. |
+| **n8n 2.0.1** | Ingress paths require explicit `pathType: Prefix` (previously hardcoded). |
+| **n8n 2.0.1** | n8n chart uses OCI (`oci://8gears.container-registry.com/library/n8n`); the old HTTP chartrepo returns HTML. |
 | **homepage 1.x** | `serviceAccount.create: true` must be set explicitly — omitting it leaves the SA missing and pods fail to schedule. |
 | **homepage 1.x** | `persistence` block at root level is incompatible with bjw-s/common v1. Remove it; config is managed via the `config:` section. |
 | **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |

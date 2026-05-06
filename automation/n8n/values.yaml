@@ -1,37 +1,38 @@
-replicaCount: 1
+main:
+  config:
+    db:
+      type: postgresdb
+      postgresdb:
+        host: "n8n-postgres-rw.databases.svc.cluster.local"
+        port: 5432
+        database: n8n
+        user: n8n
+        schema: public
 
-config:
-  database:
-    type: postgresdb
-    postgresdb:
-      host: "n8n-postgres-rw.databases.svc.cluster.local"
-      port: 5432
-      database: n8n
-      user: n8n
-      schema: public
+  extraEnv:
+    N8N_PATH:
+      value: "/n8n/"
+    N8N_EDITOR_BASE_URL:
+      value: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
+    DB_POSTGRESDB_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: n8n-db-credentials
+          key: password
 
-extraEnvSecrets:
-  DB_POSTGRESDB_PASSWORD:
-    name: n8n-db-credentials
-    key: password
+  persistence:
+    enabled: true
+    type: dynamic
+    storageClass: local-path
+    size: 5Gi
 
-persistence:
-  enabled: true
-  type: dynamic
-  storageClass: local-path
-  size: 5Gi
-
-resources:
-  requests:
-    memory: 256Mi
-    cpu: 100m
-  limits:
-    memory: 512Mi
-    cpu: 500m
-
-service:
-  type: ClusterIP
-  port: 5678
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
 
 ingress:
   enabled: true
@@ -41,8 +42,5 @@ ingress:
   hosts:
     - host: oscar-mini-m1.tail90f0a7.ts.net
       paths:
-        - /n8n/
-
-extraEnv:
-  N8N_PATH: "/n8n/"
-  N8N_EDITOR_BASE_URL: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
+        - path: /n8n/
+          pathType: Prefix
