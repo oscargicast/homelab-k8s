@@ -11,7 +11,7 @@ config:
       schema: public
 
 extraEnv:
-  - name: DB_POSTGRESDB_PASSWORD
+  DB_POSTGRESDB_PASSWORD:
     valueFrom:
       secretKeyRef:
         name: n8n-db-credentials
