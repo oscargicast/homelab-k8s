@@ -41,15 +41,12 @@ config:
             href: "https://cloudnative-pg.io"
             description: PostgreSQL operator
   widgets:
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-          label: mac-mini
-        nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
+    - greeting:
+        text_size: xl
+        text: "Homelab"
+    - datetime:
+        text_size: l
+        format:
+          dateStyle: long
+          timeStyle: short
+          hourCycle: h23
