@@ -10,12 +10,13 @@ config:
       user: n8n
       schema: public
 
-extraEnv:
-  DB_POSTGRESDB_PASSWORD:
-    valueFrom:
-      secretKeyRef:
-        name: n8n-db-credentials
-        key: password
+main:
+  extraEnv:
+    DB_POSTGRESDB_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: n8n-db-credentials
+          key: password
 
 persistence:
   enabled: true
