@@ -10,6 +10,8 @@ main:
         schema: public
 
   extraEnv:
+    N8N_SECURE_COOKIE:
+      value: "false"
     N8N_PATH:
       value: "/n8n/"
     N8N_EDITOR_BASE_URL:
