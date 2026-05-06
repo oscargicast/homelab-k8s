@@ -38,6 +38,14 @@ prometheus:
     routePrefix: /prometheus
     retention: 3d
     retentionSize: "8GB"
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
     storageSpec:
       volumeClaimTemplate:
         spec:

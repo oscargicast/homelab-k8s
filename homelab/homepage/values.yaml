@@ -37,6 +37,9 @@ config:
         - Prometheus:
             - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/prometheus"
               description: Prometheus UI
+        - CNPG Dashboard:
+            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg"
+              description: PostgreSQL operator dashboard
   services:
     - Automatización:
         - n8n:
@@ -44,10 +47,57 @@ config:
             description: Workflows
             icon: n8n.png
     - Databases:
-        - CloudNativePG:
-            href: "https://cloudnative-pg.io"
-            description: PostgreSQL operator
+        - postgres-lab:
+            description: CNPG cluster general purpose
+            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=postgres-lab&var-namespace=databases"
+            icon: postgres.png
+            widget:
+              type: prometheusmetrics
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              metrics:
+                - label: Connections
+                  query: sum(cnpg_backends_total{namespace="databases",pod=~"postgres-lab-.*"})
+                - label: DB size
+                  query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"postgres-lab-.*"})
+                  format: bytes
+                - label: TPS
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"postgres-lab-.*"}[5m]))
+                  format: float
+        - n8n-postgres:
+            description: CNPG cluster (backing n8n)
+            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
+            icon: postgres.png
+            widget:
+              type: prometheusmetrics
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              metrics:
+                - label: Connections
+                  query: sum(cnpg_backends_total{namespace="databases",pod=~"n8n-postgres-.*"})
+                - label: DB size
+                  query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"n8n-postgres-.*"})
+                  format: bytes
+                - label: TPS
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"n8n-postgres-.*"}[5m]))
+                  format: float
   widgets:
+    - resources:
+        backend: kubernetes
+        expanded: true
+        cpu: true
+        memory: true
+        cputemp: false
+        uptime: true
+        disk: /
+        label: System
+    - search:
+        provider: duckduckgo
+        target: _blank
+    - datetime:
+        text_size: xl
+        format:
+          dateStyle: long
+          timeStyle: short
+          hour12: false
     - kubernetes:
         cluster:
           show: true
@@ -60,3 +110,21 @@ config:
           cpu: true
           memory: true
           showLabel: true
+    - prometheusmetrics:
+        url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+        metrics:
+          - label: Pods running
+            query: sum(kube_pod_status_phase{phase="Running"})
+          - label: Pods pending
+            query: sum(kube_pod_status_phase{phase="Pending"})
+          - label: Active alerts
+            query: sum(ALERTS{alertstate="firing"})
+          - label: Ingress req/s
+            query: sum(rate(traefik_service_requests_total[5m]))
+            format: float
+          - label: Node CPU %
+            query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+            format: percent
+          - label: Node mem used
+            query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+            format: bytes
