@@ -3,11 +3,6 @@ replicaCount: 1
 image:
   tag: latest
 
-persistence:
-  enabled: true
-  storageClass: local-path
-  size: 1Gi
-
 resources:
   requests:
     memory: 64Mi
