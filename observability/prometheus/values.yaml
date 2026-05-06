@@ -12,9 +12,30 @@ grafana:
     limits:
       memory: 300Mi
       cpu: 200m
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - oscar-mini-m1.tail90f0a7.ts.net
+    path: /grafana
+    pathType: Prefix
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/grafana"
+      serve_from_sub_path: true
 
 prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - oscar-mini-m1.tail90f0a7.ts.net
+    paths:
+      - /prometheus
+    pathType: Prefix
   prometheusSpec:
+    externalUrl: "http://oscar-mini-m1.tail90f0a7.ts.net/prometheus"
+    routePrefix: /prometheus
     retention: 3d
     retentionSize: "8GB"
     storageSpec:

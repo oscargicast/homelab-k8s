@@ -3,9 +3,6 @@ replicaCount: 1
 serviceAccount:
   create: true
 
-image:
-  tag: latest
-
 resources:
   requests:
     memory: 64Mi
@@ -14,19 +11,29 @@ resources:
     memory: 128Mi
     cpu: 100m
 
+ingress:
+  main:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - host: ""
+        paths:
+          - path: /
+            pathType: Prefix
+
 config:
   bookmarks:
     - Observabilidad:
         - Grafana:
-            - href: "http://grafana.homelab.local"
+            - href: "http://oscar-mini-m1.tail90f0a7.ts.net/grafana"
               description: Métricas y logs
         - Prometheus:
-            - href: "http://prometheus.homelab.local"
+            - href: "http://oscar-mini-m1.tail90f0a7.ts.net/prometheus"
               description: Prometheus UI
   services:
     - Automatización:
         - n8n:
-            href: "http://n8n.homelab.local"
+            href: "http://oscar-mini-m1.tail90f0a7.ts.net/n8n/"
             description: Workflows
             icon: n8n.png
     - Databases:
