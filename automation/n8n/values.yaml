@@ -8,9 +8,14 @@ config:
       port: 5432
       database: n8n
       user: n8n
-      # La contraseña se inyecta via Secret creado por Sealed Secrets
-      # Si el chart n8n no lo soporta directamente, montar el Secret como env var
       schema: public
+
+extraEnv:
+  - name: DB_POSTGRESDB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: n8n-db-credentials
+        key: password
 
 persistence:
   enabled: true
