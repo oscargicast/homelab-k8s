@@ -17,6 +17,7 @@ extraEnvSecrets:
 
 persistence:
   enabled: true
+  type: dynamic
   storageClass: local-path
   size: 5Gi
 
