@@ -2,6 +2,9 @@ replicaCount: 1
 
 enableRbac: true
 
+env:
+  HOMEPAGE_ALLOWED_HOSTS: "oscar-mini-m1.tail90f0a7.ts.net:8080"
+
 serviceAccount:
   create: true
 
