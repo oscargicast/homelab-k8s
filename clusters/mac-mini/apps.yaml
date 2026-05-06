@@ -15,7 +15,7 @@ spec:
     path: databases
     directory:
       recurse: true
-      include: "application.yaml"
+      include: "**/application.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -41,7 +41,7 @@ spec:
     path: automation
     directory:
       recurse: true
-      include: "application.yaml"
+      include: "**/application.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -67,7 +67,7 @@ spec:
     path: homelab
     directory:
       recurse: true
-      include: "application.yaml"
+      include: "**/application.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
