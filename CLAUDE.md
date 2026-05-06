@@ -112,7 +112,7 @@ homelab-k8s/
 | CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.28.*` |
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
 | Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
-| n8n | `https://8gears.container-registry.com/chartrepo/library` | `n8n` | `0.25.*` |
+| n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `0.25.0` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `1.*` |
 
 ## Architecture Constraints
@@ -122,6 +122,21 @@ homelab-k8s/
 - Colima has 8 GB RAM allocated; apply resource limits to every workload.
 - `ServerSideApply=true` required for kube-prometheus-stack (large CRDs).
 - Multi-source Applications (`sources:` plural) require Argo CD ≥ 2.6.
+- ArgoCD initial install must use `kubectl apply --server-side` to avoid annotation-too-long errors on CRDs.
+- OCI Helm charts in Argo CD require an exact version (e.g. `0.25.0`) — semver wildcards (`0.25.*`) are not supported.
+- Directory sources use `include: "**/application.yaml"` (with `**`) to recurse into subdirectories.
+
+## Chart-specific gotchas
+
+| Chart | Gotcha |
+|---|---|
+| **n8n 0.25.0** | Use `extraEnvSecrets` (not `extraEnv`) to inject secret values. `extraEnv` only supports plain string values. |
+| **n8n 0.25.0** | `persistence.type: dynamic` is required to bind a PVC — `enabled: true` alone leaves the pod on emptyDir. |
+| **n8n 0.25.0** | n8n chart uses OCI (`oci://8gears.container-registry.com/library/n8n`); the old HTTP chartrepo returns HTML. |
+| **homepage 1.x** | `serviceAccount.create: true` must be set explicitly — omitting it leaves the SA missing and pods fail to schedule. |
+| **homepage 1.x** | `persistence` block at root level is incompatible with bjw-s/common v1. Remove it; config is managed via the `config:` section. |
+| **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
+| **loki 6.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
 
 ## Cluster Management Commands
 

@@ -85,12 +85,13 @@ rm secret.yaml  # borrar el plaintext
 ## Bootstrap (primera vez)
 
 ```bash
-# 1. Instalar Argo CD en Mac mini
+# 1. Instalar Argo CD en Mac mini (--server-side evita error de annotation demasiado larga)
 kubectl create namespace argocd
-kubectl apply -n argocd -f \
+kubectl apply --server-side -n argocd -f \
   https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 2. Instalar kubeseal en Mac mini y obtener el cert
+# 2. Instalar kubeseal (con brew en Mac mini M1) y obtener el cert
+brew install kubeseal
 kubeseal --fetch-cert \
   --controller-namespace kube-system \
   --controller-name sealed-secrets-controller \
