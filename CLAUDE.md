@@ -109,7 +109,7 @@ homelab-k8s/
 |---|---|---|---|
 | Argo CD | manual install | install.yaml | stable |
 | Sealed Secrets | `https://bitnami-labs.github.io/sealed-secrets` | `sealed-secrets` | `2.*` |
-| CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.22.*` |
+| CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.28.*` |
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
 | Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
 | n8n | `https://8gears.container-registry.com/chartrepo/library` | `n8n` | `0.25.*` |
