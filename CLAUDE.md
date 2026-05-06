@@ -87,7 +87,8 @@ homelab-k8s/
 │   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
 ├── observability/
 │   ├── prometheus/                     # kube-prometheus-stack + values
-│   └── loki/                          # Loki SingleBinary + values
+│   ├── loki/                           # Loki SingleBinary + values
+│   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG, etc.)
 ├── automation/n8n/                     # n8n + values
 └── homelab/homepage/                   # Homepage dashboard + values
 ```
@@ -143,8 +144,12 @@ homelab-k8s/
 | **n8n 2.0.1** | Set `N8N_SECURE_COOKIE=false` in `main.extraEnv` for HTTP access — n8n v1.100+ defaults to `true` and blocks login over plain HTTP. |
 | **n8n 2.0.1** | Serving n8n at a subpath (e.g. `/n8n/`) requires a Traefik StripPrefix middleware; without it, static assets return `text/html` 404s. |
 | **homepage 2.x** | `enableRbac: true` must be set explicitly for the kubernetes widget to work. |
-| **homepage 2.x** | `HOMEPAGE_ALLOWED_HOSTS` env var is required when accessed via a non-standard port (e.g. `oscar-mini-m1.tail90f0a7.ts.net:8080`). |
+| **homepage 2.x** | `HOMEPAGE_ALLOWED_HOSTS` env var is required when accessed via a non-standard port. Newer homepage app images reject anything not listed; use `"*"` for single-tenant homelab behind Tailscale (a literal hostname:port can break after image bumps). |
 | **homepage 2.x** | `config.kubernetes.mode: cluster` is required even with `enableRbac: true` — the chart's default `kubernetes.yaml` ships with `mode: disable`, so without this override the widget API returns 500 `{error: "No kubernetes configuration"}` and the UI shows "API Error" in the header. |
+| **homepage 2.x** | The `prometheusmetrics` widget calls `<url>/api/v1/query` — when Prometheus has `routePrefix: /prometheus`, the widget URL must include the prefix (e.g. `http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus`). |
+| **kube-prometheus-stack 65.x** | Default `podMonitorSelector` filters by `release: <chart>` label; PodMonitors emitted by other operators (CNPG, etc.) are ignored. Set `podMonitorSelectorNilUsesHelmValues: false` + `podMonitorSelector: {}` (and the same for `serviceMonitor*`) under `prometheusSpec` to discover cluster-wide. |
+| **CloudNativePG 0.28.x** | The operator chart does NOT ship a Grafana dashboard ConfigMap — the `monitoring.grafanaDashboard.create` value lives in the `cluster` subchart only. To get the dashboard, sideload a manual ConfigMap with the JSON from grafana.com (ID `20417`, dashboard UID `cloudnative-pg`) labeled `grafana_dashboard: "1"` in the `observability` namespace so Grafana's sidecar picks it up. |
+| **CloudNativePG 0.28.x** | Set `spec.monitoring.enablePodMonitor: true` on each `Cluster` resource to expose metrics on port 9187 and emit a `PodMonitor` (which Prometheus needs the relaxed selectors above to discover). |
 | **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
 | **loki 6.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
 

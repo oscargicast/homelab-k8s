@@ -66,7 +66,8 @@ homelab-k8s/
 │   └── n8n-postgres/
 ├── observability/
 │   ├── prometheus/                     # values.yaml
-│   └── loki/                          # values.yaml
+│   ├── loki/                           # values.yaml
+│   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG)
 ├── automation/n8n/
 └── homelab/homepage/
 ```
@@ -115,10 +116,10 @@ Todos los servicios se sirven a través de Traefik en un único punto de entrada
 kubectl port-forward -n traefik svc/traefik --address 0.0.0.0 8080:80
 
 # Servicios disponibles en http://oscar-mini-m1.tail90f0a7.ts.net:8080/
-# - Homepage:   /
-# - Grafana:    /grafana
-# - Prometheus: /prometheus
-# - n8n:        /n8n/
+# - Homepage:        /                   (con widgets de Postgres en vivo)
+# - Grafana:         /grafana            (dashboard CNPG en folder "Databases")
+# - Prometheus:      /prometheus
+# - n8n:             /n8n/
 ```
 
 ## Acceder a Argo CD
