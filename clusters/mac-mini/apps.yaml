@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/TU_USUARIO/homelab-k8s.git
+    repoURL: https://github.com/oscargicast/homelab-k8s.git
     targetRevision: HEAD
     path: databases
     directory:
@@ -36,7 +36,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/TU_USUARIO/homelab-k8s.git
+    repoURL: https://github.com/oscargicast/homelab-k8s.git
     targetRevision: HEAD
     path: automation
     directory:
@@ -62,7 +62,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/TU_USUARIO/homelab-k8s.git
+    repoURL: https://github.com/oscargicast/homelab-k8s.git
     targetRevision: HEAD
     path: homelab
     directory:

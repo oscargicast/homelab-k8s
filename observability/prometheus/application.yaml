@@ -14,7 +14,7 @@ spec:
       helm:
         valueFiles:
           - $values/observability/prometheus/values.yaml
-    - repoURL: https://github.com/TU_USUARIO/homelab-k8s.git
+    - repoURL: https://github.com/oscargicast/homelab-k8s.git
       targetRevision: HEAD
       ref: values
   destination:
