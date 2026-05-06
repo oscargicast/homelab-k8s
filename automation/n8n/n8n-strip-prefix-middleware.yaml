@@ -1,0 +1,9 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: n8n-strip-prefix
+  namespace: automation
+spec:
+  stripPrefix:
+    prefixes:
+      - /n8n

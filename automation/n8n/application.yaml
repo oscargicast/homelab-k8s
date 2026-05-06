@@ -21,7 +21,7 @@ spec:
       targetRevision: HEAD
       path: automation/n8n
       directory:
-        include: "sealed-secret.yaml"
+        include: "{sealed-secret.yaml,n8n-strip-prefix-middleware.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: automation

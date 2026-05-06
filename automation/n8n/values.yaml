@@ -36,6 +36,8 @@ service:
 ingress:
   enabled: true
   className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: automation-n8n-strip-prefix@kubernetescrd
   hosts:
     - host: oscar-mini-m1.tail90f0a7.ts.net
       paths:
