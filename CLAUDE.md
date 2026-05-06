@@ -4,11 +4,128 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Context
 
-This is a homelab Kubernetes project running on a **Mac mini M1** (headless, accessed via SSH over Tailscale). Kubernetes runs inside a Colima VM. All YAML manifests and Helm values are managed here.
+This is a homelab Kubernetes project running on a **Mac mini M1** (headless, accessed via SSH over Tailscale). Kubernetes runs inside a Colima VM. All YAML manifests and Helm values are managed here via **GitOps with Argo CD**.
 
 Access model: MacBook Pro → SSH via Tailscale → Mac mini M1 → Colima VM → Kubernetes.
 
+**Work split:**
+- **MacBook Pro (this machine):** edit YAML files, git commit, git push
+- **Mac mini (`ssh macmini`):** kubectl, helm, colima, argocd CLI
+
+## GitOps Workflow
+
+This repo uses the **App of Apps** pattern with Argo CD. Do NOT run `kubectl apply` manually for workloads — push to Git and Argo CD syncs automatically.
+
+```
+Git push → Argo CD detects change → applies to cluster
+```
+
+The only manual `kubectl apply` is the bootstrap:
+```bash
+# One-time bootstrap (run on Mac mini):
+kubectl apply -f bootstrap/argocd/root-app.yaml
+```
+
+## Secrets — Sealed Secrets
+
+**Never commit plaintext secrets.** `.gitignore` blocks `**/secret.yaml`.
+
+Workflow to add/update a secret:
+```bash
+# 1. Create plaintext secret in /tmp (never in repo)
+cat > /tmp/my-secret.yaml << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+  namespace: target-namespace
+type: kubernetes.io/basic-auth
+stringData:
+  username: user
+  password: password-here
+EOF
+
+# 2. Seal with cluster's public cert (run on Mac mini to get cert first)
+kubeseal \
+  --cert ~/.config/homelab-k8s-sealed-secrets-pub.pem \
+  --format yaml \
+  < /tmp/my-secret.yaml \
+  > path/to/sealed-secret.yaml
+
+# 3. Commit the sealed-secret.yaml (safe to commit)
+git add path/to/sealed-secret.yaml && git commit -m "feat: add sealed secret"
+
+# 4. Delete the plaintext
+rm /tmp/my-secret.yaml
+```
+
+Get the cluster cert (run on Mac mini):
+```bash
+kubeseal --fetch-cert \
+  --controller-namespace kube-system \
+  --controller-name sealed-secrets-controller \
+  > ~/.config/homelab-k8s-sealed-secrets-pub.pem
+```
+
+## Repository Structure
+
+```
+homelab-k8s/
+├── .gitignore                          # blocks **/secret.yaml
+├── bootstrap/argocd/root-app.yaml      # one-time manual bootstrap
+├── clusters/mac-mini/                  # cluster-level parent Applications
+│   ├── apps.yaml                       # databases + automation + homelab
+│   ├── infrastructure.yaml             # namespaces + operators
+│   └── observability.yaml             # prometheus + loki
+├── infrastructure/
+│   ├── namespaces/                     # Namespace CRs
+│   ├── sealed-secrets/application.yaml # Sealed Secrets operator
+│   └── cloudnative-pg/application.yaml # CNPG operator
+├── databases/
+│   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
+│   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
+├── observability/
+│   ├── prometheus/                     # kube-prometheus-stack + values
+│   └── loki/                          # Loki SingleBinary + values
+├── automation/n8n/                     # n8n + values
+└── homelab/homepage/                   # Homepage dashboard + values
+```
+
+## Namespaces
+
+| Namespace | Purpose |
+|---|---|
+| `argocd` | Argo CD (GitOps controller) |
+| `kube-system` | Sealed Secrets operator |
+| `cnpg-system` | CloudNativePG operator |
+| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres) |
+| `observability` | Prometheus, Grafana, Loki |
+| `automation` | n8n |
+| `homelab` | Homepage dashboard |
+
+## Stack & Helm Charts
+
+| Component | Helm repo | Chart | Version |
+|---|---|---|---|
+| Argo CD | manual install | install.yaml | stable |
+| Sealed Secrets | `https://bitnami-labs.github.io/sealed-secrets` | `sealed-secrets` | `2.*` |
+| CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.22.*` |
+| Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
+| Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
+| n8n | `https://8gears.container-registry.com/chartrepo/library` | `n8n` | `0.25.*` |
+| Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `1.*` |
+
+## Architecture Constraints
+
+- **Single-node cluster** — no real HA. PVCs use `local-path` StorageClass.
+- All persistent services must have PVCs with `storageClass: local-path`.
+- Colima has 8 GB RAM allocated; apply resource limits to every workload.
+- `ServerSideApply=true` required for kube-prometheus-stack (large CRDs).
+- Multi-source Applications (`sources:` plural) require Argo CD ≥ 2.6.
+
 ## Cluster Management Commands
+
+Run these on **Mac mini** (`ssh macmini`):
 
 ```bash
 # Start cluster
@@ -20,53 +137,25 @@ kubectl get nodes -o wide
 kubectl get pods -A
 kubectl get storageclass
 
+# Argo CD — check all apps
+kubectl get applications -n argocd -o wide
+
+# Force sync an app
+argocd app sync <app-name>
+
 # Events (sorted by time)
 kubectl get events -A --sort-by=.metadata.creationTimestamp
-
-# Apply a manifest
-kubectl apply -f <file>.yaml
 
 # Port-forward a service (expose to MacBook via Tailscale IP)
 kubectl port-forward -n <namespace> svc/<service> --address 0.0.0.0 <local>:<remote>
 ```
 
-## Namespaces
+## Argo CD Access
 
-| Namespace | Purpose |
-|---|---|
-| `databases` | CloudNativePG operator + PostgreSQL clusters |
-| `observability` | Prometheus, Grafana, Loki |
-| `automation` | n8n |
-| `homelab` | Homepage dashboard |
-| `cnpg-system` | CloudNativePG operator |
-
-## Stack & Helm Repos
-
-| Component | Helm repo / chart |
-|---|---|
-| CloudNativePG | `cnpg` → `https://cloudnative-pg.github.io/charts` |
-| Prometheus+Grafana | `prometheus-community` → `kube-prometheus-stack` |
-| Loki | `grafana` → `https://grafana.github.io/helm-charts` |
-
-## Architecture Constraints
-
-- **Single-node cluster** — no real HA. PVCs use `local-path` StorageClass.
-- All persistent services (PostgreSQL, n8n, Loki, Grafana) must have PVCs.
-- Colima has 8 GB RAM allocated; apply resource limits to every workload.
-- Service exposure order: port-forward first → Ingress with `*.homelab.local` hostnames → Tailscale DNS.
-
-## Repository Structure (planned)
-
+```bash
+# On Mac mini:
+kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8080:443
+# Open: https://<tailscale-ip>:8080
+# User: admin
+# Pass: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
-homelab/
-├── databases/       # CNPG Cluster manifests + Secrets
-├── observability/   # prometheus-values.yaml, loki-values.yaml
-├── automation/      # n8n-values.yaml
-├── homelab/         # Homepage values + config
-├── ingress/         # Ingress resources
-└── scripts/         # status.sh, port-forwards.sh
-```
-
-## Credentials Convention
-
-Secrets use `kubernetes.io/basic-auth` type. Placeholder passwords in manifests (`*-change-me`) must be replaced before `kubectl apply`. Future direction: SOPS or Sealed Secrets.
