@@ -4,3 +4,6 @@
 
 # Los SealedSecrets SÍ van a git (encriptados)
 # **/sealed-secret.yaml  ← estos son seguros para commitear
+
+# Notas locales
+TODO.md
