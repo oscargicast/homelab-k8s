@@ -27,6 +27,8 @@ ingress:
             pathType: Prefix
 
 config:
+  kubernetes:
+    mode: cluster
   bookmarks:
     - Observabilidad:
         - Grafana:
