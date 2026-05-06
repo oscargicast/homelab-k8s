@@ -144,6 +144,7 @@ homelab-k8s/
 | **n8n 2.0.1** | Serving n8n at a subpath (e.g. `/n8n/`) requires a Traefik StripPrefix middleware; without it, static assets return `text/html` 404s. |
 | **homepage 2.x** | `enableRbac: true` must be set explicitly for the kubernetes widget to work. |
 | **homepage 2.x** | `HOMEPAGE_ALLOWED_HOSTS` env var is required when accessed via a non-standard port (e.g. `oscar-mini-m1.tail90f0a7.ts.net:8080`). |
+| **homepage 2.x** | `config.kubernetes.mode: cluster` is required even with `enableRbac: true` — the chart's default `kubernetes.yaml` ships with `mode: disable`, so without this override the widget API returns 500 `{error: "No kubernetes configuration"}` and the UI shows "API Error" in the header. |
 | **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
 | **loki 6.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
 
