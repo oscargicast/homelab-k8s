@@ -41,6 +41,30 @@ config:
             - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg"
               description: PostgreSQL operator dashboard
   services:
+    - Cluster:
+        - Overview:
+            description: Estado general del cluster
+            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana"
+            icon: kubernetes.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              metrics:
+                - label: Pods running
+                  query: sum(kube_pod_status_phase{phase="Running"})
+                - label: Pods pending
+                  query: sum(kube_pod_status_phase{phase="Pending"})
+                - label: Active alerts
+                  query: sum(ALERTS{alertstate="firing"})
+                - label: Ingress req/s
+                  query: sum(rate(traefik_service_requests_total[5m]))
+                  format: number
+                - label: Node CPU %
+                  query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+                  format: percent
+                - label: Node mem used
+                  query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+                  format: bytes
     - Automatización:
         - n8n:
             href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
@@ -62,7 +86,7 @@ config:
                   format: bytes
                 - label: TPS
                   query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"postgres-lab-.*"}[5m]))
-                  format: float
+                  format: number
         - n8n-postgres:
             description: CNPG cluster (backing n8n)
             href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
@@ -78,7 +102,7 @@ config:
                   format: bytes
                 - label: TPS
                   query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"n8n-postgres-.*"}[5m]))
-                  format: float
+                  format: number
   widgets:
     - resources:
         backend: kubernetes
@@ -110,21 +134,3 @@ config:
           cpu: true
           memory: true
           showLabel: true
-    - prometheusmetric:
-        url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
-        metrics:
-          - label: Pods running
-            query: sum(kube_pod_status_phase{phase="Running"})
-          - label: Pods pending
-            query: sum(kube_pod_status_phase{phase="Pending"})
-          - label: Active alerts
-            query: sum(ALERTS{alertstate="firing"})
-          - label: Ingress req/s
-            query: sum(rate(traefik_service_requests_total[5m]))
-            format: float
-          - label: Node CPU %
-            query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-            format: percent
-          - label: Node mem used
-            query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
-            format: bytes
