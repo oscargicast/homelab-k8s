@@ -52,7 +52,7 @@ config:
             href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=postgres-lab&var-namespace=databases"
             icon: postgres.png
             widget:
-              type: prometheusmetrics
+              type: prometheusmetric
               url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
               metrics:
                 - label: Connections
@@ -68,7 +68,7 @@ config:
             href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
             icon: postgres.png
             widget:
-              type: prometheusmetrics
+              type: prometheusmetric
               url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
               metrics:
                 - label: Connections
@@ -110,7 +110,7 @@ config:
           cpu: true
           memory: true
           showLabel: true
-    - prometheusmetrics:
+    - prometheusmetric:
         url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
         metrics:
           - label: Pods running
