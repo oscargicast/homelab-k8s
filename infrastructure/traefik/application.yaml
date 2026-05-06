@@ -34,8 +34,7 @@ spec:
             cpu: 100m
 
         ports:
-          web:
-            redirectTo: {}
+          web: {}
 
   destination:
     server: https://kubernetes.default.svc
