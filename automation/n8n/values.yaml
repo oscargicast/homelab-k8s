@@ -39,8 +39,7 @@ ingress:
   hosts:
     - host: oscar-mini-m1.tail90f0a7.ts.net
       paths:
-        - path: /n8n/
-          pathType: Prefix
+        - /n8n/
 
 extraEnv:
   N8N_PATH: "/n8n/"
