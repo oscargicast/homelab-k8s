@@ -81,7 +81,8 @@ homelab-k8s/
 │   ├── namespaces/                     # Namespace CRs
 │   ├── sealed-secrets/application.yaml # Sealed Secrets operator
 │   ├── cloudnative-pg/application.yaml # CNPG operator
-│   └── traefik/application.yaml        # Traefik ingress controller
+│   ├── traefik/application.yaml        # Traefik ingress controller
+│   └── argocd-config/params-cm.yaml    # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
 │   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
