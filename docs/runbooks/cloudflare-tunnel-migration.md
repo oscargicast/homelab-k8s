@@ -1,6 +1,8 @@
 # Runbook: migrar a subdomain-based routing con Cloudflare Tunnel
 
-Migra **n8n, Grafana y Homepage** a subdominios públicos vía Cloudflare Tunnel, y **Prometheus** a un subdominio interno (resuelto solo en tailnet via CNAME). Resultado: cero hacks de routing path-based en el repo.
+Migra **n8n, Grafana, Homepage y Argo CD** a subdominios públicos vía Cloudflare Tunnel (los 3 últimos detrás de Cloudflare Access), y **Prometheus** a un subdominio interno (resuelto solo en tailnet via CNAME). Resultado: cero hacks de routing path-based en el repo.
+
+> Notas históricas: la migración inicial cubrió n8n/Grafana/Homepage/Prometheus. Argo CD se sumó como **follow-up** después — ver "Follow-up: exponer Argo CD" al final.
 
 ## Resumen de cambios
 
@@ -9,8 +11,8 @@ Migra **n8n, Grafana y Homepage** a subdominios públicos vía Cloudflare Tunnel
 | n8n | `oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/` | `https://n8n.oscargicast.com` | Público (auth propia) |
 | Grafana | `...:8080/grafana` | `https://grafana.oscargicast.com` | Público + CF Access |
 | Homepage | `...:8080/` (host vacío) | `https://homepage.oscargicast.com` | Público + CF Access |
+| Argo CD | `...:8443` (port-forward) | `https://argocd.oscargicast.com` | Público + CF Access (+ admin password) |
 | Prometheus | `...:8080/prometheus` | `http://prometheus.oscargicast.com:8080` | Solo tailnet |
-| Argo CD | `...:8443` (port-forward) | igual | Solo tailnet |
 
 ## DNS records que vas a tener
 
@@ -21,7 +23,8 @@ Todos en la zona `oscargicast.com` en Cloudflare.
 | 1 | `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Auto-creado por CF al agregar Public Hostname |
 | 2 | `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Auto |
 | 3 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Auto |
-| 4 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | **Manual** |
+| 4 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
+| 5 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | **Manual** |
 
 > Crítico: el #4 NO debe estar proxied — el proxy de CF no puede llegar a una IP Tailscale privada. Tiene que ser grey-cloud (DNS only).
 
@@ -229,7 +232,7 @@ kubectl get ingress -A | grep oscargicast
   curl -I http://prometheus.oscargicast.com:8080/
   ```
   Browser: `http://prometheus.oscargicast.com:8080/` → UI Prometheus en root
-- [ ] **Argo CD**: `https://oscar-mini-m1.tail90f0a7.ts.net:8443` sigue funcionando
+- [ ] **Argo CD**: ver "Follow-up: exponer Argo CD" más abajo (en la migración inicial seguía como port-forward `:8443`; después se movió a `https://argocd.oscargicast.com`).
 - [ ] **Webhook real**: workflow con webhook trigger en n8n + POST externo (`curl` desde Cloudflare Workers, webhook.site, etc.) → llega a n8n
 
 ---
@@ -314,4 +317,47 @@ kubectl describe ingress -n <ns> <ingress-name>
 # 2b. Si el host NO aparece en el config:
 #     → 404 es de cloudflared. Ir al dashboard CF, agregar la Public Hostname.
 ```
+
+---
+
+## Follow-up: exponer Argo CD
+
+Pasado el deploy inicial, Argo CD también se migró a subdomain público (`argocd.oscargicast.com`) detrás de Cloudflare Access. El patrón es idéntico al de los otros servicios, con una particularidad: argocd-server por default sirve **HTTPS con cert self-signed**, lo cual no se lleva bien con un tunnel que termina TLS al edge. Solución: setear `--insecure` para que sirva HTTP plano internamente.
+
+### Pasos
+
+1. **`infrastructure/argocd-config/params-cm.yaml`**: agregar `data: { server.insecure: "true" }` (override del ConfigMap `argocd-cmd-params-cm`).
+2. **`infrastructure/argocd-config/ingress-public.yaml`** (nuevo): `Ingress` host-based `argocd.oscargicast.com` → `argocd-server:80`.
+3. **CF dashboard** (mismo flujo que para los otros):
+   - Public Hostname `argocd.oscargicast.com` → `traefik.traefik.svc.cluster.local:80`
+   - Verificar el CNAME (probablemente requiere creación manual, ver lección #1)
+   - Access app self-hosted con policy email
+4. `git commit && git push` → ArgoCD aplica.
+5. **Importante** (ver lección #5 abajo): forzar restart de `argocd-server` para que tome `--insecure`.
+6. Detener el port-forward `:8443` de Argo CD (queda obsoleto).
+7. (Recomendado) Rotar la admin password de Argo CD vía UI.
+
+### 5. ArgoCD `argocd-cmd-params-cm` no auto-restartea argocd-server
+
+Cambios en el ConfigMap `argocd-cmd-params-cm` (ej. flippear `server.insecure: "true"`) **no provocan** un rolling restart del `Deployment argocd-server`. Argo CD lo lee solo al startup. ArgoCD aplica el cambio del ConfigMap vía GitOps, pero el pod sigue corriendo con la config vieja.
+
+**Síntoma**: después de hacer push y configurar el tunnel, `https://argocd.oscargicast.com` da `ERR_TOO_MANY_REDIRECTS`. argocd-server sigue serviendo HTTPS, recibe HTTP del tunnel y redirige a HTTPS, generando un loop.
+
+**Diagnóstico**:
+```bash
+# El AGE del pod debe ser bajo (post-cambio del CM); si tiene varios días, no se reinició:
+kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server
+
+# Logs del nuevo pod deben mostrar "tls: false":
+kubectl logs -n argocd deploy/argocd-server --tail=20 | grep "serving on port"
+# Esperado: "argocd v3.x.y serving on port 8080 (... tls: false ...)"
+```
+
+**Fix**:
+```bash
+kubectl rollout restart deployment/argocd-server -n argocd
+kubectl rollout status deployment/argocd-server -n argocd
+```
+
+**Prevención**: incluir el `kubectl rollout restart` como paso obligatorio cada vez que se modifica `argocd-cmd-params-cm` (o `argocd-cm`), o agregar una annotation/label que cambie en el Deployment para forzar el rollout vía GitOps.
 
