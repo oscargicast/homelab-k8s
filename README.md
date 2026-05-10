@@ -38,29 +38,28 @@ graph LR
         CFD[cloudflared pod<br/>2 réplicas]
         TRA[Traefik svc:80]
         PF8080[Mac mini host :8080<br/>kubectl port-forward]
-        PF8443[Mac mini host :8443<br/>kubectl port-forward]
         N8N[n8n.automation:80]
         GRA[prometheus-grafana.observability:80]
         HOM[homepage.homelab:3000]
+        ARGO[argocd-server.argocd:80]
         PROM[prometheus...:9090]
-        ARGO[argocd-server:443]
     end
 
     USR_EXT -->|n8n.oscargicast.com| EDGE
     USR_EXT -->|grafana.oscargicast.com| EDGE
     USR_EXT -->|homepage.oscargicast.com| EDGE
+    USR_EXT -->|argocd.oscargicast.com| EDGE
     EDGE --> TUNNEL
     TUNNEL --> CFD
     CFD --> TRA
     TRA --> N8N
     TRA --> GRA
     TRA --> HOM
+    TRA --> ARGO
 
     USR_INT -->|prometheus.oscargicast.com:8080<br/>CNAME→tailscale| PF8080
     PF8080 --> TRA
     TRA --> PROM
-    USR_INT -->|tailscale-host:8443| PF8443
-    PF8443 --> ARGO
 ```
 
 ## Cómo funciona el GitOps
@@ -163,20 +162,18 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | n8n | `https://n8n.oscargicast.com` | Público (auth propia) |
 | Grafana | `https://grafana.oscargicast.com` | Público + Cloudflare Access |
 | Homepage | `https://homepage.oscargicast.com` | Público + Cloudflare Access |
+| Argo CD | `https://argocd.oscargicast.com` | Público + Cloudflare Access (+ admin password de Argo CD) |
 | Prometheus | `http://prometheus.oscargicast.com:8080` | Solo tailnet (CNAME→Tailscale) |
-| Argo CD | `https://oscar-mini-m1.tail90f0a7.ts.net:8443` | Solo tailnet (port-forward) |
 
 Los públicos pasan por **Cloudflare Tunnel** (cloudflared corriendo en cluster con conexión saliente a CF edge), TLS terminado en CF, sin abrir puertos en la red.
 
-Para los privados (Prometheus + Argo CD) hay que tener corriendo los port-forwards en Mac mini:
+Para Prometheus (interno por tailnet) hay que tener corriendo el port-forward de Traefik en Mac mini:
 
 ```bash
-# Necesario para Prometheus interno (prometheus.oscargicast.com:8080)
 kubectl port-forward -n traefik svc/traefik --address 0.0.0.0 8080:80
-
-# Necesario para la UI de Argo CD
-kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
 ```
+
+> Argo CD ya **no** requiere port-forward — pasó a estar detrás de CF Tunnel + Access en `argocd.oscargicast.com`. El argocd-server corre con `server.insecure: true` (sirve HTTP plano internamente; CF termina TLS al edge).
 
 Password inicial de Argo CD:
 
@@ -192,6 +189,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 | `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel (a veces requiere creación manual) |
 | `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
+| `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (no debe estar proxied — IP Tailscale es privada) |
 
 ## Recursos del cluster

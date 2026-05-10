@@ -137,7 +137,7 @@ homelab-k8s/
 
 ## Cloudflare Tunnel routing
 
-The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Grafana, Homepage) and **internal via Tailscale + Traefik** (Prometheus, Argo CD).
+The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Grafana, Homepage, Argo CD) and **internal via Tailscale + Traefik** (Prometheus).
 
 ### Architecture
 
@@ -152,15 +152,27 @@ The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n,
 | `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
+| `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale IP is private) |
 
 ### Config-as-code trade-off
 
-The 3 Public Hostname rules (all → Traefik) live in the **CF dashboard**, not in Git. The actual routing logic (host matching, middlewares, headers) lives in **Traefik `Ingress` resources in this repo**. The CF rules are trivial and stable, so adding a new public service = adding one `Ingress` here + one CNAME/Public Hostname in CF.
+The Public Hostname rules (all → Traefik) live in the **CF dashboard**, not in Git. The actual routing logic (host matching, middlewares, headers) lives in **Traefik `Ingress` resources in this repo**. The CF rules are trivial and stable, so adding a new public service = adding one `Ingress` here + one CNAME/Public Hostname in CF.
 
 ### Cloudflare Access
 
-`grafana.oscargicast.com` and `homepage.oscargicast.com` are protected by Self-hosted Access applications (policy: email = `oscar.gi.cast@gmail.com`). `n8n.oscargicast.com` is **not** behind Access — it has its own login. Prometheus has no Access (only reachable on tailnet).
+`grafana`, `homepage` and `argocd.oscargicast.com` are protected by Self-hosted Access applications (policy: email = `oscar.gi.cast@gmail.com`). `n8n.oscargicast.com` is **not** behind Access — it has its own login. Prometheus has no Access (only reachable on tailnet).
+
+### Argo CD specifics
+
+Argo CD runs in `--insecure` mode (HTTP-only) so the tunnel can proxy it cleanly without dealing with self-signed certs. The override is in `infrastructure/argocd-config/params-cm.yaml`:
+
+```yaml
+data:
+  server.insecure: "true"
+```
+
+This makes `argocd-server` serve HTTP on its container port 8080. The Service exposes both port 80 and 443 forwarding to that same port, so the Ingress targets `argocd-server:80`. CF terminates TLS at the edge, the intra-cluster hop is HTTP. No port-forward needed anymore — drop `kubectl port-forward -n argocd svc/argocd-server :8443:443` once `argocd.oscargicast.com` is verified.
 
 ### Pending
 
@@ -222,10 +234,17 @@ kubectl port-forward -n <namespace> svc/<service> --address 0.0.0.0 <local>:<rem
 
 ## Argo CD Access
 
-```bash
-# On Mac mini (port 8080 is used by Traefik):
-kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
-# Open: https://<tailscale-ip>:8443
-# User: admin
-# Pass: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+Public via CF Tunnel + Access:
+
 ```
+https://argocd.oscargicast.com
+```
+
+Auth flow: CF Access (Google email) → Argo CD login (`admin` + initial password):
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+```
+
+> Si necesitás acceso de emergencia con el tunnel caído, el fallback temporal es `kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:80` (notar `80`, no `443`, porque ahora corre en `--insecure` mode) y abrir `http://<tailscale-ip>:8443`. Usar solo en emergencia.
