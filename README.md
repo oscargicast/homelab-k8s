@@ -1,26 +1,71 @@
 # Homelab Kubernetes — Mac mini M1
 
-Laboratorio Kubernetes personal corriendo en una **Mac mini M1 headless**, gestionado con **GitOps (Argo CD)**.
+Laboratorio Kubernetes personal corriendo en una **Mac mini M1 headless**, gestionado con **GitOps (Argo CD)** y expuesto al mundo vía **Cloudflare Tunnel** sobre el dominio `oscargicast.com`.
 
+## Stack en el cluster
+
+```mermaid
+graph TD
+    MBP[MacBook Pro]
+    MBP -->|SSH via Tailscale| MM[Mac mini M1]
+    MM --> COL[Colima VM]
+    COL --> K8S[K3s en Kubernetes]
+
+    K8S --> NS_ARGOCD[argocd<br/><i>Argo CD GitOps</i>]
+    K8S --> NS_KS[kube-system<br/><i>Sealed Secrets operator</i>]
+    K8S --> NS_CNPG[cnpg-system<br/><i>CloudNativePG operator</i>]
+    K8S --> NS_DB[databases<br/><i>postgres-lab + n8n-postgres</i>]
+    K8S --> NS_OBS[observability<br/><i>Prometheus + Grafana + Loki</i>]
+    K8S --> NS_TRA[traefik<br/><i>Ingress controller por Host</i>]
+    K8S --> NS_CFD[cloudflared<br/><i>Cloudflare Tunnel connector</i>]
+    K8S --> NS_AUT[automation<br/><i>n8n</i>]
+    K8S --> NS_HL[homelab<br/><i>Homepage dashboard</i>]
 ```
-MacBook Pro
-  └── SSH vía Tailscale
-        └── Mac mini M1
-              └── Colima VM
-                    └── Kubernetes (K3s)
-                          ├── Argo CD          ← GitOps controller
-                          ├── Sealed Secrets   ← gestión de credenciales
-                          ├── CloudNativePG    ← operador PostgreSQL
-                          ├── PostgreSQL       ← postgres-lab + n8n-postgres
-                          ├── Prometheus + Grafana + Loki ← observabilidad
-                          ├── Traefik          ← ingress controller
-                          ├── n8n              ← automatización de workflows
-                          └── Homepage         ← dashboard del homelab
+
+## Cómo se accede a cada servicio
+
+```mermaid
+graph LR
+    USR_EXT[👤 Usuario en internet]
+    USR_INT[👤 Usuario en tailnet]
+
+    subgraph CF[Cloudflare]
+        EDGE[Edge<br/>TLS + Access]
+        TUNNEL[Tunnel]
+    end
+
+    subgraph CLUSTER[Cluster Mac mini]
+        CFD[cloudflared pod<br/>2 réplicas]
+        TRA[Traefik svc:80]
+        PF8080[Mac mini host :8080<br/>kubectl port-forward]
+        PF8443[Mac mini host :8443<br/>kubectl port-forward]
+        N8N[n8n.automation:80]
+        GRA[prometheus-grafana.observability:80]
+        HOM[homepage.homelab:3000]
+        PROM[prometheus...:9090]
+        ARGO[argocd-server:443]
+    end
+
+    USR_EXT -->|n8n.oscargicast.com| EDGE
+    USR_EXT -->|grafana.oscargicast.com| EDGE
+    USR_EXT -->|homepage.oscargicast.com| EDGE
+    EDGE --> TUNNEL
+    TUNNEL --> CFD
+    CFD --> TRA
+    TRA --> N8N
+    TRA --> GRA
+    TRA --> HOM
+
+    USR_INT -->|prometheus.oscargicast.com:8080<br/>CNAME→tailscale| PF8080
+    PF8080 --> TRA
+    TRA --> PROM
+    USR_INT -->|tailscale-host:8443| PF8443
+    PF8443 --> ARGO
 ```
 
-## Cómo funciona
+## Cómo funciona el GitOps
 
-Este repo usa el patrón **App of Apps** de Argo CD. Hacer push a `main` es suficiente para que los cambios se apliquen al cluster automáticamente.
+Patrón **App of Apps** de Argo CD. Hacer push a `main` es suficiente para que los cambios se apliquen al cluster automáticamente.
 
 ```
 git push → Argo CD detecta el cambio → aplica al cluster
@@ -29,7 +74,6 @@ git push → Argo CD detecta el cambio → aplica al cluster
 El único `kubectl apply` manual es el bootstrap inicial:
 
 ```bash
-# Desde Mac mini, una sola vez:
 kubectl apply -f bootstrap/argocd/root-app.yaml
 ```
 
@@ -44,7 +88,8 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | n8n-postgres | PostgreSQL dedicado para n8n | `databases` |
 | kube-prometheus-stack | Métricas (Prometheus + Grafana) | `observability` |
 | Loki | Logs centralizados | `observability` |
-| Traefik | Ingress controller (routing por path) | `traefik` |
+| Traefik | Ingress controller (routing por Host) | `traefik` |
+| cloudflared | Cloudflare Tunnel connector (saliente) | `cloudflared` |
 | n8n | Automatización de workflows | `automation` |
 | Homepage | Dashboard visual del homelab | `homelab` |
 
@@ -55,23 +100,25 @@ homelab-k8s/
 ├── bootstrap/argocd/root-app.yaml      # bootstrap manual (una sola vez)
 ├── clusters/mac-mini/                  # Apps de nivel cluster
 │   ├── apps.yaml                       # databases + automation + homelab
-│   ├── infrastructure.yaml             # namespaces + operadores
+│   ├── infrastructure.yaml             # namespaces + operadores + cloudflared
 │   └── observability.yaml
 ├── infrastructure/
 │   ├── namespaces/                     # Namespace CRs
 │   ├── sealed-secrets/                 # Sealed Secrets operator
 │   ├── cloudnative-pg/                 # CNPG operator
 │   ├── traefik/                        # Traefik ingress controller
+│   ├── cloudflared/                    # CF Tunnel: deployment + sealed-secret + Application
 │   └── argocd-config/                  # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # cluster.yaml + sealed-secret.yaml
 │   └── n8n-postgres/
 ├── observability/
-│   ├── prometheus/                     # values.yaml
+│   ├── prometheus/                     # values.yaml + ingresses (grafana, prometheus)
 │   ├── loki/                           # values.yaml
 │   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG)
-├── automation/n8n/
-└── homelab/homepage/
+├── automation/n8n/                     # values.yaml + ingress-public.yaml
+├── homelab/homepage/                   # values.yaml + ingress-public.yaml
+└── docs/runbooks/                      # runbooks de operación
 ```
 
 ## Gestión de secrets
@@ -95,7 +142,7 @@ kubectl create namespace argocd
 kubectl apply --server-side -n argocd -f \
   https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 2. Instalar kubeseal (con brew en Mac mini M1) y obtener el cert
+# 2. Instalar kubeseal y obtener el cert
 brew install kubeseal
 kubeseal --fetch-cert \
   --controller-namespace kube-system \
@@ -111,31 +158,41 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 
 ## Acceder a los servicios
 
-Todos los servicios se sirven a través de Traefik en un único punto de entrada:
+| Servicio | URL | Acceso |
+|---|---|---|
+| n8n | `https://n8n.oscargicast.com` | Público (auth propia) |
+| Grafana | `https://grafana.oscargicast.com` | Público + Cloudflare Access |
+| Homepage | `https://homepage.oscargicast.com` | Público + Cloudflare Access |
+| Prometheus | `http://prometheus.oscargicast.com:8080` | Solo tailnet (CNAME→Tailscale) |
+| Argo CD | `https://oscar-mini-m1.tail90f0a7.ts.net:8443` | Solo tailnet (port-forward) |
+
+Los públicos pasan por **Cloudflare Tunnel** (cloudflared corriendo en cluster con conexión saliente a CF edge), TLS terminado en CF, sin abrir puertos en la red.
+
+Para los privados (Prometheus + Argo CD) hay que tener corriendo los port-forwards en Mac mini:
 
 ```bash
-# Port-forward desde Mac mini:
+# Necesario para Prometheus interno (prometheus.oscargicast.com:8080)
 kubectl port-forward -n traefik svc/traefik --address 0.0.0.0 8080:80
 
-# Servicios disponibles en http://oscar-mini-m1.tail90f0a7.ts.net:8080/
-# - Homepage:        /                   (con widgets de Postgres en vivo)
-# - Grafana:         /grafana            (dashboard CNPG en folder "Databases")
-# - Prometheus:      /prometheus
-# - n8n:             /n8n/
+# Necesario para la UI de Argo CD
+kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
 ```
 
-## Acceder a Argo CD
+Password inicial de Argo CD:
 
 ```bash
-# Port-forward desde Mac mini (puerto 8080 lo usa Traefik):
-kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:443
-
-# Abrir: https://<tailscale-ip>:8443
-# Usuario: admin
-# Contraseña:
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d
 ```
+
+## DNS records en Cloudflare
+
+| Hostname | Type | Target | Proxy | Origen |
+|---|---|---|---|---|
+| `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel (a veces requiere creación manual) |
+| `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
+| `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
+| `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (no debe estar proxied — IP Tailscale es privada) |
 
 ## Recursos del cluster
 
@@ -147,3 +204,8 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 | StorageClass | `local-path` (single-node) |
 
 > Cluster single-node — no hay alta disponibilidad real. Ideal para aprendizaje y servicios personales.
+
+## Documentación adicional
+
+- [`docs/runbooks/cloudflare-tunnel-migration.md`](docs/runbooks/cloudflare-tunnel-migration.md) — runbook + lessons learned de la migración a subdomain-based routing
+- [`CLAUDE.md`](CLAUDE.md) — guía operativa completa con gotchas por chart

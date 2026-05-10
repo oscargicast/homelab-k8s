@@ -130,15 +130,42 @@ rm /tmp/cloudflared-token.yaml
 
 ## Fase 3 — Configurar Cloudflare (browser)
 
-### 3a — Public Hostnames del tunnel
+### 3a — Public Hostnames del tunnel (Published Applications)
 
-`https://one.dash.cloudflare.com/` → Networks → Tunnels → `homelab-k8s` → tab **Public Hostname** → Add a public hostname (3 veces):
+`https://one.dash.cloudflare.com/` → Networks → Tunnels → `homelab-k8s` → tab **Public Hostname** (o **Routes → Add a route → Published application** según UI) → 3 veces:
 
 - [ ] `n8n.oscargicast.com` → HTTP → `traefik.traefik.svc.cluster.local:80`
 - [ ] `grafana.oscargicast.com` → HTTP → `traefik.traefik.svc.cluster.local:80`
 - [ ] `homepage.oscargicast.com` → HTTP → `traefik.traefik.svc.cluster.local:80`
 
-> Esto crea automáticamente los 3 CNAME proxied en la zona oscargicast.com.
+> **CF debería** auto-crear los 3 CNAMEs proxied en la zona oscargicast.com.
+
+#### Verificación crítica (no asumas que se crearon)
+
+`https://dash.cloudflare.com/` → `oscargicast.com` → DNS → Records. Confirmá que existen los 3 CNAMEs:
+
+| Name | Target | Proxy |
+|---|---|---|
+| `n8n` | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied |
+| `grafana` | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied |
+| `homepage` | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied |
+
+Y desde tu MacBook:
+```bash
+dig n8n.oscargicast.com @1.1.1.1 +short
+dig grafana.oscargicast.com @1.1.1.1 +short
+dig homepage.oscargicast.com @1.1.1.1 +short
+```
+
+Los 3 deben devolver IPs anycast de Cloudflare (`104.21.x.x`, `172.67.x.x`).
+
+#### Si algún CNAME falta
+
+A veces (depende del flujo UI usado) el auto-create falla silenciosamente. Crear manualmente: DNS → Add record → Type `CNAME`, Name `<subdominio>`, Target `<TUNNEL_UUID>.cfargotunnel.com`, **Proxy on** (orange-cloud), Save.
+
+> El `<TUNNEL_UUID>` se obtiene de los logs de cloudflared (`tunnelID=...`) o del dashboard del tunnel.
+
+> **Observación**: en flujos donde después se agregan Access apps (3b), CF puede crear el CNAME al guardar la Access app — por eso los servicios sin Access (como n8n) son los que más probablemente requieran creación manual.
 
 ### 3b — Cloudflare Access policies
 
@@ -215,3 +242,76 @@ kubectl get ingress -A | grep oscargicast
   - `git commit` + push del nuevo `sealed-secret.yaml`
   - Verificar que cloudflared sigue conectado después del rolling update
 - [ ] Monitorear logs de cloudflared y métricas de Traefik durante un par de días
+
+---
+
+## Lessons learned (deploy real)
+
+Estos son los issues que aparecieron al ejecutar este runbook por primera vez. Si los enfrentás de nuevo, ya sabés cómo diagnosticarlos.
+
+### 1. La auto-creación del CNAME en CF DNS puede fallar silenciosamente
+
+Al agregar Public Hostnames en el dashboard del tunnel (especialmente vía la nueva UI **Routes → Add a route → Published application**), Cloudflare _debería_ crear automáticamente el CNAME `<host>.oscargicast.com → <UUID>.cfargotunnel.com` en la zona DNS. **No siempre lo hace.**
+
+En este deploy: `grafana` y `homepage` se crearon (probablemente por el flujo de Access app que los reconcilió). `n8n` NO se creó.
+
+**Síntoma**: `dig n8n.oscargicast.com @1.1.1.1` devuelve `NXDOMAIN`.
+
+**Solución**:
+1. `https://dash.cloudflare.com/` → `oscargicast.com` → DNS → Records → Add record
+2. Type `CNAME`, Name `<subdominio>`, Target `<TUNNEL_UUID>.cfargotunnel.com`, **Proxy on** (orange-cloud)
+3. El TUNNEL_UUID se ve en los logs de cloudflared (`grep tunnelID`)
+
+**Prevención**: después de agregar cada Public Hostname, validar inmediatamente con `dig <host> @1.1.1.1 +short` que devuelva IPs anycast de CF (`104.21.x.x`, `172.67.x.x`).
+
+### 2. El Service de n8n expone puerto 80, no 5678
+
+El chart `8gears/n8n:2.0.1` crea un `Service` que expone **port 80** (mapea internamente al container port `5678` del pod n8n). Si creás un `Ingress` separado del chart y le ponés `port.number: 5678`, Traefik no encuentra endpoints válidos en ese port y devuelve `404 page not found` con `content-length: 19`.
+
+**Síntoma**: `kubectl describe ingress -n automation n8n-public` muestra `Backends: n8n:5678 ()` con paréntesis vacíos.
+
+**Solución**: cambiar `port.number` a `80` en el Ingress.
+
+**Prevención**: antes de definir un `Ingress` apuntando a un Service de chart, verificar el puerto real con `kubectl get svc -n <namespace>`.
+
+### 3. Tailscale MagicDNS cachea NXDOMAIN
+
+El resolver `100.100.100.100` (Tailscale) cachea respuestas negativas según el TTL del SOA upstream. Cloudflare devuelve `1800` segundos (30 min) en su SOA. Resultado: aunque el CNAME ya exista en CF DNS, el sistema sigue viendo `NXDOMAIN` por hasta 30 min.
+
+**Síntoma**: `dig <host> @1.1.1.1` resuelve correctamente (con IPs anycast), pero `curl <host>` falla con `Could not resolve host`. Es decir: query directa al upstream funciona, pero el resolver del sistema (`getaddrinfo`) no.
+
+**Diagnóstico**:
+```bash
+dig <host>                    # usa system resolver (Tailscale)
+dig <host> @1.1.1.1           # bypass directo a Cloudflare
+scutil --dns | head -10       # ver qué nameservers usa macOS
+```
+
+Si `scutil --dns` muestra `nameserver[0] : 100.100.100.100`, Tailscale está interceptando.
+
+**Solución**: `tailscale down && sleep 2 && tailscale up` resetea el cache de Tailscale. Esperar ~5s después.
+
+> Nota: `sudo dscacheutil -flushcache` y `sudo killall -HUP mDNSResponder` solo limpian el cache local de macOS, **NO** afectan al cache de Tailscale.
+
+### 4. Distinguir 404 de cloudflared vs 404 de Traefik
+
+Ambos devuelven exactamente la misma firma: body `404 page not found\n`, `content-length: 19`, `text/plain` — porque ambos usan Go's `http.NotFound` por default. Hay que diferenciarlos para saber dónde está el problema.
+
+**cloudflared catch-all** (`service: http_status:404`): la request llegó al pod pero ningún ingress rule matchea el Host. Indica que la Public Hostname no está registrada en el config actual del tunnel.
+
+**Traefik no-route**: la request llegó a Traefik pero no hay router/endpoint backend válido. Indica un problema en el `Ingress` (host mal escrito, backend Service inexistente, port equivocado).
+
+**Diagnóstico**:
+```bash
+# 1. Ver el config actual de cloudflared
+kubectl logs -n cloudflared deploy/cloudflared --tail=300 | grep configuration | tail -3
+
+# 2a. Si el host SÍ aparece en la última "Updated to new configuration":
+#     → 404 es de Traefik. Revisar el Ingress:
+kubectl describe ingress -n <ns> <ingress-name>
+# Buscar línea "Backends: <svc>:<port> (<endpoints>)" — los paréntesis NO deben estar vacíos.
+
+# 2b. Si el host NO aparece en el config:
+#     → 404 es de cloudflared. Ir al dashboard CF, agregar la Public Hostname.
+```
+

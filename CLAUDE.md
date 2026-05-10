@@ -75,23 +75,25 @@ homelab-k8s/
 ├── bootstrap/argocd/root-app.yaml      # one-time manual bootstrap
 ├── clusters/mac-mini/                  # cluster-level parent Applications
 │   ├── apps.yaml                       # databases + automation + homelab
-│   ├── infrastructure.yaml             # namespaces + operators
+│   ├── infrastructure.yaml             # namespaces + operators + cloudflared
 │   └── observability.yaml             # prometheus + loki
 ├── infrastructure/
 │   ├── namespaces/                     # Namespace CRs
 │   ├── sealed-secrets/application.yaml # Sealed Secrets operator
 │   ├── cloudnative-pg/application.yaml # CNPG operator
 │   ├── traefik/application.yaml        # Traefik ingress controller
+│   ├── cloudflared/                    # CF Tunnel: deployment + sealed-secret + Application
 │   └── argocd-config/params-cm.yaml    # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
 │   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
 ├── observability/
-│   ├── prometheus/                     # kube-prometheus-stack + values
+│   ├── prometheus/                     # kube-prometheus-stack + values + ingresses
 │   ├── loki/                           # Loki SingleBinary + values
 │   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG, etc.)
-├── automation/n8n/                     # n8n + values
-└── homelab/homepage/                   # Homepage dashboard + values
+├── automation/n8n/                     # n8n + values + ingress-public
+├── homelab/homepage/                   # Homepage dashboard + values + ingress-public
+└── docs/runbooks/                      # operational runbooks
 ```
 
 ## Namespaces
@@ -104,6 +106,7 @@ homelab-k8s/
 | `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
+| `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
 | `automation` | n8n |
 | `homelab` | Homepage dashboard |
 
@@ -117,6 +120,7 @@ homelab-k8s/
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `65.*` |
 | Loki | `https://grafana.github.io/helm-charts` | `loki` | `6.*` |
 | Traefik | `https://helm.traefik.io/traefik` | `traefik` | `40.0.0` |
+| cloudflared | _(no Helm chart, manifest-based)_ | `cloudflare/cloudflared` image | `2024.10.0` |
 | n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `2.0.1` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
 
@@ -131,6 +135,37 @@ homelab-k8s/
 - OCI Helm charts in Argo CD require an exact version (e.g. `0.25.0`) — semver wildcards (`0.25.*`) are not supported.
 - Directory sources use `include: "**/application.yaml"` (with `**`) to recurse into subdirectories.
 
+## Cloudflare Tunnel routing
+
+The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Grafana, Homepage) and **internal via Tailscale + Traefik** (Prometheus, Argo CD).
+
+### Architecture
+
+- `cloudflared` runs as a 2-replica `Deployment` in the `cloudflared` namespace, authenticating with a token sealed via Bitnami SealedSecrets (`infrastructure/cloudflared/sealed-secret.yaml`, key `token`).
+- The connection is **outbound-only** from the cluster to Cloudflare edge over QUIC — no inbound ports open on the Mac mini.
+- All public hostnames in CF point to **the same backend**: `traefik.traefik.svc.cluster.local:80`. Cloudflare Tunnel forwards every public request to Traefik, and **Traefik routes by `Host` header** using regular `Ingress` resources (`*-public` Ingresses living next to each app's `values.yaml`).
+
+### DNS records (zone `oscargicast.com`)
+
+| Hostname | Type | Target | Proxy | Source |
+|---|---|---|---|---|
+| `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
+| `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
+| `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
+| `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale IP is private) |
+
+### Config-as-code trade-off
+
+The 3 Public Hostname rules (all → Traefik) live in the **CF dashboard**, not in Git. The actual routing logic (host matching, middlewares, headers) lives in **Traefik `Ingress` resources in this repo**. The CF rules are trivial and stable, so adding a new public service = adding one `Ingress` here + one CNAME/Public Hostname in CF.
+
+### Cloudflare Access
+
+`grafana.oscargicast.com` and `homepage.oscargicast.com` are protected by Self-hosted Access applications (policy: email = `oscar.gi.cast@gmail.com`). `n8n.oscargicast.com` is **not** behind Access — it has its own login. Prometheus has no Access (only reachable on tailnet).
+
+### Pending
+
+- **Rotar el token de cloudflared**: el token original se compartió en chat durante el planning. Rotarlo desde `Networks → Tunnels → homelab-k8s → ⋯ → Refresh token`, repetir kubeseal (Fase 2 del runbook), commitear y pushear el nuevo `sealed-secret.yaml`.
+
 ## Chart-specific gotchas
 
 | Chart | Gotcha |
@@ -142,19 +177,21 @@ homelab-k8s/
 | **n8n 2.0.1** | `persistence.type: dynamic` is required to bind a PVC — must be under `main.persistence`. |
 | **n8n 2.0.1** | Ingress paths require explicit `pathType: Prefix` (previously hardcoded). |
 | **n8n 2.0.1** | n8n chart uses OCI (`oci://8gears.container-registry.com/library/n8n`); the old HTTP chartrepo returns HTML. |
-| **n8n 2.0.1** | Set `N8N_SECURE_COOKIE=false` in `main.extraEnv` for HTTP access — n8n v1.100+ defaults to `true` and blocks login over plain HTTP. |
-| **n8n 2.0.1** | Serving n8n at a subpath (e.g. `/n8n/`) requires a Traefik StripPrefix middleware; without it, static assets return `text/html` 404s. |
+| **n8n 2.0.1** | The `Service` created by the chart exposes port **80** (mapping internally to the n8n container's `5678`). When defining a separate `Ingress`, target `port: 80`, not `5678`, otherwise Traefik returns 404 with no endpoints. Verify with `kubectl get svc -n automation`. |
 | **homepage 2.x** | `enableRbac: true` must be set explicitly for the kubernetes widget to work. |
 | **homepage 2.x** | `HOMEPAGE_ALLOWED_HOSTS` env var is required when accessed via a non-standard port. Newer homepage app images reject anything not listed; use `"*"` for single-tenant homelab behind Tailscale (a literal hostname:port can break after image bumps). |
 | **homepage 2.x** | `config.kubernetes.mode: cluster` is required even with `enableRbac: true` — the chart's default `kubernetes.yaml` ships with `mode: disable`, so without this override the widget API returns 500 `{error: "No kubernetes configuration"}` and the UI shows "API Error" in the header. |
 | **homepage 2.x** | The Prometheus widget is named `prometheusmetric` (singular) and is **service-only** — valid only nested under `services[].<group>.<service>.widget:` (`type: prometheusmetric`). Putting it in the top-level `config.widgets:` array yields `Missing Widget Type: prometheusmetric` in the header. The top-level array only accepts info widgets: `resources`, `search`, `datetime`, `kubernetes`, `glances`, `greeting`, `logo`, `longhorn`, `openmeteo`, `openweathermap`, `stocks`, `unifi_console`. For a cluster-wide overview, create a services group (e.g. `Cluster` → `Overview`) and attach the widget there. |
-| **homepage 2.x** | The `prometheusmetric` widget calls `<url>/api/v1/query` — when Prometheus has `routePrefix: /prometheus`, the widget URL must include the prefix (e.g. `http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus`). |
 | **homepage 2.x** | Widget `format:` values come from a fixed list: `text, number, percent, bytes, bits, bbytes, bbits, byterate, bibyterate, bitrate, bibitrate, date, duration, relativeDate`. `float` is not valid — use `number` for plain numeric formatting (otherwise the value renders as a raw unformatted string). |
 | **kube-prometheus-stack 65.x** | Default `podMonitorSelector` filters by `release: <chart>` label; PodMonitors emitted by other operators (CNPG, etc.) are ignored. Set `podMonitorSelectorNilUsesHelmValues: false` + `podMonitorSelector: {}` (and the same for `serviceMonitor*`) under `prometheusSpec` to discover cluster-wide. |
 | **CloudNativePG 0.28.x** | The operator chart does NOT ship a Grafana dashboard ConfigMap — the `monitoring.grafanaDashboard.create` value lives in the `cluster` subchart only. To get the dashboard, sideload a manual ConfigMap with the JSON from grafana.com (ID `20417`, dashboard UID `cloudnative-pg`) labeled `grafana_dashboard: "1"` in the `observability` namespace so Grafana's sidecar picks it up. |
 | **CloudNativePG 0.28.x** | Set `spec.monitoring.enablePodMonitor: true` on each `Cluster` resource to expose metrics on port 9187 and emit a `PodMonitor` (which Prometheus needs the relaxed selectors above to discover). |
 | **loki 6.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
 | **loki 6.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
+| **Cloudflare Tunnel** | Adding a Public Hostname _should_ auto-create the corresponding CNAME in CF DNS, but it **fails silently** in some flows (especially for hostnames without a Cloudflare Access app on top, e.g. n8n). After adding each Public Hostname, verify with `dig <host> @1.1.1.1 +short` — it must return CF anycast IPs (`104.21.x.x`, `172.67.x.x`). If `NXDOMAIN`, create the CNAME manually: target `<TUNNEL_UUID>.cfargotunnel.com`, orange-cloud (Proxied). |
+| **Tailscale MagicDNS** | The `100.100.100.100` resolver caches `NXDOMAIN` according to the upstream SOA negative TTL (Cloudflare = 1800s = 30 min). `dscacheutil -flushcache` does NOT clear Tailscale's cache. To bypass: `dig <host> @1.1.1.1`. To force refresh: `tailscale down && tailscale up`. |
+| **infrastructure parent Application** | When a subdir under `infrastructure/` contains manifests beyond `application.yaml` (e.g. `infrastructure/cloudflared/deployment.yaml`), the parent in `clusters/mac-mini/infrastructure.yaml` must use `directory.include: "{**/application.yaml,argocd-config/*.yaml,namespaces/*.yaml}"`. Without that filter, the parent picks up those manifests with destination `argocd` namespace, racing the child Application. |
+| **CF Tunnel 404 diagnosis** | A `404 page not found\n` body with `content-length: 19` is Go's default `http.NotFound` — returned by both **cloudflared** (catch-all `service: http_status:404` rule) and **Traefik** (no router/endpoint match). To distinguish: `kubectl logs -n cloudflared deploy/cloudflared \| grep configuration` — if the host appears in the latest config, the 404 is from Traefik (check `kubectl describe ingress` for empty `Backends`). If the host is absent, it's cloudflared's catch-all (re-add the Public Hostname in CF dashboard). |
 
 ## Cluster Management Commands
 
