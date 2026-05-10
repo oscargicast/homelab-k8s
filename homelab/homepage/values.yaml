@@ -55,6 +55,10 @@ config:
                 - label: Node mem used
                   query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
                   format: bytes
+        - Argo CD:
+            href: "https://argocd.oscargicast.com"
+            description: GitOps controller
+            icon: argo-cd.png
     - Automatización:
         - n8n:
             href: "https://n8n.oscargicast.com/"
