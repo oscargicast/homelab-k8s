@@ -10,12 +10,14 @@ main:
         schema: public
 
   extraEnv:
+    N8N_HOST:
+      value: "n8n.oscargicast.com"
+    N8N_PROTOCOL:
+      value: "https"
     N8N_SECURE_COOKIE:
-      value: "false"
-    N8N_PATH:
-      value: "/n8n/"
-    N8N_EDITOR_BASE_URL:
-      value: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
+      value: "true"
+    WEBHOOK_URL:
+      value: "https://n8n.oscargicast.com/"
     DB_POSTGRESDB_PASSWORD:
       valueFrom:
         secretKeyRef:
@@ -35,14 +37,3 @@ main:
     limits:
       memory: 512Mi
       cpu: 500m
-
-ingress:
-  enabled: true
-  className: traefik
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: automation-n8n-strip-prefix@kubernetescrd
-  hosts:
-    - host: oscar-mini-m1.tail90f0a7.ts.net
-      paths:
-        - path: /n8n/
-          pathType: Prefix

@@ -16,39 +16,29 @@ resources:
     memory: 128Mi
     cpu: 100m
 
-ingress:
-  main:
-    enabled: true
-    ingressClassName: traefik
-    hosts:
-      - host: ""
-        paths:
-          - path: /
-            pathType: Prefix
-
 config:
   kubernetes:
     mode: cluster
   bookmarks:
     - Observabilidad:
         - Grafana:
-            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana"
+            - href: "https://grafana.oscargicast.com"
               description: Métricas y logs
         - Prometheus:
-            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/prometheus"
+            - href: "http://prometheus.oscargicast.com:8080/"
               description: Prometheus UI
         - CNPG Dashboard:
-            - href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg"
+            - href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg"
               description: PostgreSQL operator dashboard
   services:
     - Cluster:
         - Overview:
             description: Estado general del cluster
-            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana"
+            href: "https://grafana.oscargicast.com"
             icon: kubernetes.png
             widget:
               type: prometheusmetric
-              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
               metrics:
                 - label: Pods running
                   query: sum(kube_pod_status_phase{phase="Running"})
@@ -67,17 +57,17 @@ config:
                   format: bytes
     - Automatización:
         - n8n:
-            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/n8n/"
+            href: "https://n8n.oscargicast.com/"
             description: Workflows
             icon: n8n.png
     - Databases:
         - postgres-lab:
             description: CNPG cluster general purpose
-            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=postgres-lab&var-namespace=databases"
+            href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=postgres-lab&var-namespace=databases"
             icon: postgres.png
             widget:
               type: prometheusmetric
-              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
               metrics:
                 - label: Connections
                   query: sum(cnpg_backends_total{namespace="databases",pod=~"postgres-lab-.*"})
@@ -89,11 +79,11 @@ config:
                   format: number
         - n8n-postgres:
             description: CNPG cluster (backing n8n)
-            href: "http://oscar-mini-m1.tail90f0a7.ts.net:8080/grafana/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
+            href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
             icon: postgres.png
             widget:
               type: prometheusmetric
-              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/prometheus
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
               metrics:
                 - label: Connections
                   query: sum(cnpg_backends_total{namespace="databases",pod=~"n8n-postgres-.*"})

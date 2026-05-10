@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: infrastructure
+  name: cloudflared
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,16 +12,15 @@ spec:
   source:
     repoURL: https://github.com/oscargicast/homelab-k8s.git
     targetRevision: HEAD
-    path: infrastructure
+    path: infrastructure/cloudflared
     directory:
-      recurse: true
-      include: "{**/application.yaml,argocd-config/*.yaml,namespaces/*.yaml}"
+      include: "{deployment.yaml,sealed-secret.yaml}"
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: cloudflared
   syncPolicy:
     automated:
-      prune: false
+      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false

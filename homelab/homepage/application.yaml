@@ -17,6 +17,11 @@ spec:
     - repoURL: https://github.com/oscargicast/homelab-k8s.git
       targetRevision: HEAD
       ref: values
+    - repoURL: https://github.com/oscargicast/homelab-k8s.git
+      targetRevision: HEAD
+      path: homelab/homepage
+      directory:
+        include: "{ingress-public.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: homelab
