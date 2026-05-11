@@ -57,8 +57,12 @@ spec:
             - name: DATABASE_SAVE_DATA_HISTORIC
               value: "true"
             - name: LOG_LEVEL
-              value: "WARN"
+              value: "ERROR,WARN,INFO,LOG,VERBOSE,WEBHOOKS,WEBSOCKET"
             - name: DEL_INSTANCE
+              value: "false"
+            - name: PROMETHEUS_METRICS
+              value: "true"
+            - name: METRICS_AUTH_REQUIRED
               value: "false"
           readinessProbe:
             httpGet:
