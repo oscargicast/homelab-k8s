@@ -18,6 +18,12 @@ spec:
       containers:
         - name: evolution-api
           image: evoapicloud/evolution-api:v2.3.0
+          command: ["sh", "-c"]
+          args:
+            - |
+              sed -i 's/if (!isMe(from) && !isMeLid(from)) {/if (false) {/' /evolution/node_modules/baileys/lib/Utils/decode-wa-message.js
+              echo "Patched Baileys: disabled LID sender check"
+              exec node dist/main
           ports:
             - name: http
               containerPort: 8080
