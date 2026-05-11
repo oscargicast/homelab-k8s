@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evolution-api
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: evolution-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: evolution-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: evolution-api
+    spec:
+      containers:
+        - name: evolution-api
+          image: evoapicloud/evolution-api:v2.3.7
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVER_URL
+              value: "https://evolution.oscargicast.com"
+            - name: AUTHENTICATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: evolution-api-secrets
+                  key: api-key
+            - name: DATABASE_ENABLED
+              value: "true"
+            - name: DATABASE_PROVIDER
+              value: "postgresql"
+            - name: DATABASE_CONNECTION_URI
+              valueFrom:
+                secretKeyRef:
+                  name: evolution-api-secrets
+                  key: database-url
+            - name: DATABASE_SAVE_DATA_INSTANCE
+              value: "true"
+            - name: DATABASE_SAVE_DATA_NEW_MESSAGE
+              value: "true"
+            - name: DATABASE_SAVE_MESSAGE_UPDATE
+              value: "true"
+            - name: DATABASE_SAVE_DATA_CONTACTS
+              value: "true"
+            - name: DATABASE_SAVE_DATA_CHATS
+              value: "true"
+            - name: DATABASE_SAVE_DATA_LABELS
+              value: "true"
+            - name: DATABASE_SAVE_DATA_HISTORIC
+              value: "true"
+            - name: LOG_LEVEL
+              value: "WARN"
+            - name: DEL_INSTANCE
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m

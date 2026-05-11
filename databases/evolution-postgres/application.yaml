@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: evolution-postgres
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/oscargicast/homelab-k8s.git
+    targetRevision: HEAD
+    path: databases/evolution-postgres
+    directory:
+      include: "{cluster.yaml,sealed-secret.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: databases
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

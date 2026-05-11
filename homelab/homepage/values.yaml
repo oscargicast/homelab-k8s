@@ -68,6 +68,10 @@ config:
             href: "https://n8n.oscargicast.com/"
             description: Workflows
             icon: n8n.png
+        - Evolution API:
+            href: "https://evolution.oscargicast.com"
+            description: WhatsApp API
+            icon: whatsapp.png
     - Databases:
         - postgres-lab:
             description: CNPG cluster general purpose
@@ -104,6 +108,25 @@ config:
                     type: bytes
                 - label: TPS
                   query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"n8n-postgres-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"n8n-postgres-.*"}[5m]))
+                  format:
+                    type: number
+                    suffix: /s
+        - evolution-postgres:
+            description: CNPG cluster (backing Evolution API)
+            href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=evolution-postgres&var-namespace=databases"
+            icon: postgres.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Connections
+                  query: sum(cnpg_backends_total{namespace="databases",pod=~"evolution-postgres-.*"})
+                - label: DB size
+                  query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"evolution-postgres-.*"})
+                  format:
+                    type: bytes
+                - label: TPS
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"evolution-postgres-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"evolution-postgres-.*"}[5m]))
                   format:
                     type: number
                     suffix: /s
