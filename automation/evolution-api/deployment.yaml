@@ -64,6 +64,10 @@ spec:
               value: "true"
             - name: METRICS_AUTH_REQUIRED
               value: "false"
+            - name: CACHE_REDIS_ENABLED
+              value: "false"
+            - name: CACHE_LOCAL_ENABLED
+              value: "true"
           readinessProbe:
             httpGet:
               path: /
