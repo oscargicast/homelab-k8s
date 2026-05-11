@@ -48,13 +48,17 @@ config:
                   query: sum(ALERTS{alertstate="firing"})
                 - label: Ingress req/s
                   query: sum(rate(traefik_service_requests_total[5m]))
-                  format: number
+                  format:
+                    type: number
+                    suffix: /s
                 - label: Node CPU %
                   query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-                  format: percent
+                  format:
+                    type: percent
                 - label: Node mem used
                   query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
-                  format: bytes
+                  format:
+                    type: bytes
         - Argo CD:
             href: "https://argocd.oscargicast.com"
             description: GitOps controller
@@ -77,10 +81,13 @@ config:
                   query: sum(cnpg_backends_total{namespace="databases",pod=~"postgres-lab-.*"})
                 - label: DB size
                   query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"postgres-lab-.*"})
-                  format: bytes
+                  format:
+                    type: bytes
                 - label: TPS
-                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"postgres-lab-.*"}[5m]))
-                  format: number
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"postgres-lab-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"postgres-lab-.*"}[5m]))
+                  format:
+                    type: number
+                    suffix: /s
         - n8n-postgres:
             description: CNPG cluster (backing n8n)
             href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
@@ -93,10 +100,13 @@ config:
                   query: sum(cnpg_backends_total{namespace="databases",pod=~"n8n-postgres-.*"})
                 - label: DB size
                   query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"n8n-postgres-.*"})
-                  format: bytes
+                  format:
+                    type: bytes
                 - label: TPS
-                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"n8n-postgres-.*"}[5m]))
-                  format: number
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"n8n-postgres-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"n8n-postgres-.*"}[5m]))
+                  format:
+                    type: number
+                    suffix: /s
   widgets:
     - resources:
         backend: kubernetes
