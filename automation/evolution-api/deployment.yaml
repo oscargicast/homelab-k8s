@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: evolution-api
-          image: evoapicloud/evolution-api:v2.3.7
+          image: evoapicloud/evolution-api:v2.3.2
           ports:
             - name: http
               containerPort: 8080
