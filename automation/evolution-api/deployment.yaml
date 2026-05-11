@@ -24,7 +24,7 @@ spec:
             - name: http
               containerPort: 8085
           env:
-            - name: PORT
+            - name: SERVER_PORT
               value: "8085"
             - name: SERVER_URL
               value: "https://evolution.oscargicast.com"
