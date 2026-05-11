@@ -194,8 +194,20 @@ Test desde browser:
 
 ## Fase 5 — Conectar WhatsApp
 
-### 5a — Crear instancia
+### 5a — Acceder al manager
 
+1. Abrir `https://evolution.oscargicast.com/manager` en el browser
+2. Login con:
+   - **Server URL**: `https://evolution.oscargicast.com`
+   - **API Key Global**: el API key generado en Fase 2
+
+### 5b — Crear instancia
+
+Desde el manager: crear una nueva instancia con nombre `whatsapp-personal`.
+
+El número de teléfono se ingresa **sin `+`**, **sin espacios ni guiones** — solo código de país + número. Ejemplo para Perú: `51907898162`.
+
+Alternativa vía CLI:
 ```bash
 curl -X POST https://evolution.oscargicast.com/instance/create \
   -H "apikey: <TU_API_KEY>" \
@@ -203,15 +215,13 @@ curl -X POST https://evolution.oscargicast.com/instance/create \
   -d '{"instanceName":"whatsapp-personal","integration":"WHATSAPP-BAILEYS","qrcode":true}'
 ```
 
-La respuesta incluye un campo `qrcode.base64` con la imagen del QR.
+### 5c — Escanear QR
 
-### 5b — Escanear QR
-
-1. Abrir `https://evolution.oscargicast.com/manager` en el browser
-2. Abrir WhatsApp en el teléfono → Dispositivos vinculados → Vincular dispositivo
+1. En el manager, abrir la instancia creada — aparece el QR code
+2. En el teléfono: WhatsApp → Dispositivos vinculados → Vincular dispositivo
 3. Escanear el QR code
 
-### 5c — Verificar conexión
+### 5d — Verificar conexión
 
 ```bash
 curl -s https://evolution.oscargicast.com/instance/connectionState/whatsapp-personal \
