@@ -21,6 +21,7 @@ spec:
           command: ["sh", "-c"]
           args:
             - |
+              bash /evolution/Docker/scripts/deploy_database.sh
               sed -i 's/if (!isMe(from) && !isMeLid(from)) {/if (false) {/' /evolution/node_modules/baileys/lib/Utils/decode-wa-message.js
               echo "Patched Baileys: disabled LID sender check"
               exec node dist/main
@@ -59,7 +60,7 @@ spec:
             - name: DATABASE_SAVE_DATA_HISTORIC
               value: "true"
             - name: LOG_LEVEL
-              value: "WARN"
+              value: "DEBUG"
             - name: DEL_INSTANCE
               value: "false"
           readinessProbe:
