@@ -22,8 +22,10 @@ spec:
           image: evoapicloud/evolution-api:v2.3.7
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 8085
           env:
+            - name: PORT
+              value: "8085"
             - name: SERVER_URL
               value: "https://evolution.oscargicast.com"
             - name: AUTHENTICATION_API_KEY
@@ -61,13 +63,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: 8085
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: 8085
             initialDelaySeconds: 15
             periodSeconds: 20
             failureThreshold: 3

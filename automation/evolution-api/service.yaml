@@ -11,6 +11,6 @@ spec:
     app.kubernetes.io/name: evolution-api
   ports:
     - name: http
-      port: 8080
-      targetPort: 8080
+      port: 8085
+      targetPort: 8085
       protocol: TCP
