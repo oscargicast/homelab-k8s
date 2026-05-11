@@ -18,7 +18,7 @@ graph TD
     K8S --> NS_OBS[observability<br/><i>Prometheus + Grafana + Loki</i>]
     K8S --> NS_TRA[traefik<br/><i>Ingress controller por Host</i>]
     K8S --> NS_CFD[cloudflared<br/><i>Cloudflare Tunnel connector</i>]
-    K8S --> NS_AUT[automation<br/><i>n8n</i>]
+    K8S --> NS_AUT[automation<br/><i>n8n + evolution-api</i>]
     K8S --> NS_HL[homelab<br/><i>Homepage dashboard</i>]
 ```
 
@@ -39,6 +39,7 @@ graph LR
         TRA[Traefik svc:80]
         PF8080[Mac mini host :8080<br/>kubectl port-forward]
         N8N[n8n.automation:80]
+        EVO[evolution-api hostNetwork :8085]
         GRA[prometheus-grafana.observability:80]
         HOM[homepage.homelab:3000]
         ARGO[argocd-server.argocd:80]
@@ -46,6 +47,7 @@ graph LR
     end
 
     USR_EXT -->|n8n.oscargicast.com| EDGE
+    USR_EXT -->|evolution.oscargicast.com| EDGE
     USR_EXT -->|grafana.oscargicast.com| EDGE
     USR_EXT -->|homepage.oscargicast.com| EDGE
     USR_EXT -->|argocd.oscargicast.com| EDGE
@@ -53,6 +55,7 @@ graph LR
     TUNNEL --> CFD
     CFD --> TRA
     TRA --> N8N
+    TRA --> EVO
     TRA --> GRA
     TRA --> HOM
     TRA --> ARGO
@@ -85,11 +88,13 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | CloudNativePG | Operador PostgreSQL | `cnpg-system` |
 | postgres-lab | PostgreSQL de pruebas | `databases` |
 | n8n-postgres | PostgreSQL dedicado para n8n | `databases` |
+| evolution-postgres | PostgreSQL dedicado para Evolution API | `databases` |
 | kube-prometheus-stack | Métricas (Prometheus + Grafana) | `observability` |
 | Loki | Logs centralizados | `observability` |
 | Traefik | Ingress controller (routing por Host) | `traefik` |
 | cloudflared | Cloudflare Tunnel connector (saliente) | `cloudflared` |
 | n8n | Automatización de workflows | `automation` |
+| Evolution API | API de WhatsApp Web (integración con n8n) | `automation` |
 | Homepage | Dashboard visual del homelab | `homelab` |
 
 ## Estructura del repo
@@ -110,12 +115,15 @@ homelab-k8s/
 │   └── argocd-config/                  # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # cluster.yaml + sealed-secret.yaml
-│   └── n8n-postgres/
+│   ├── n8n-postgres/
+│   └── evolution-postgres/             # CNPG cluster para Evolution API
 ├── observability/
 │   ├── prometheus/                     # values.yaml + ingresses (grafana, prometheus)
 │   ├── loki/                           # values.yaml
 │   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG)
-├── automation/n8n/                     # values.yaml + ingress-public.yaml
+├── automation/
+│   ├── n8n/                            # values.yaml + ingress-public.yaml
+│   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
 ├── homelab/homepage/                   # values.yaml + ingress-public.yaml
 └── docs/runbooks/                      # runbooks de operación
 ```
@@ -160,6 +168,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | Servicio | URL | Acceso |
 |---|---|---|
 | n8n | `https://n8n.oscargicast.com` | Público (auth propia) |
+| Evolution API | `https://evolution.oscargicast.com` | Público + Cloudflare Access (manager UI + API key) |
 | Grafana | `https://grafana.oscargicast.com` | Público + Cloudflare Access |
 | Homepage | `https://homepage.oscargicast.com` | Público + Cloudflare Access |
 | Argo CD | `https://argocd.oscargicast.com` | Público + Cloudflare Access (+ admin password de Argo CD) |
@@ -187,6 +196,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 | Hostname | Type | Target | Proxy | Origen |
 |---|---|---|---|---|
 | `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel (a veces requiere creación manual) |
+| `evolution.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
@@ -206,4 +216,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 ## Documentación adicional
 
 - [`docs/runbooks/cloudflare-tunnel-migration.md`](docs/runbooks/cloudflare-tunnel-migration.md) — runbook + lessons learned de la migración a subdomain-based routing
+- [`docs/runbooks/evolution-api-setup.md`](docs/runbooks/evolution-api-setup.md) — runbook para desplegar Evolution API + WhatsApp + n8n
+- [`docs/runbooks/secrets-cheatsheet.md`](docs/runbooks/secrets-cheatsheet.md) — comandos para extraer secrets del cluster
+- [`docs/runbooks/db-access.md`](docs/runbooks/db-access.md) — acceso a las DBs CNPG vía port-forward + Tailscale
 - [`CLAUDE.md`](CLAUDE.md) — guía operativa completa con gotchas por chart

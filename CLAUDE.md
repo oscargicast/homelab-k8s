@@ -86,12 +86,15 @@ homelab-k8s/
 │   └── argocd-config/params-cm.yaml    # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
-│   └── n8n-postgres/                  # CNPG Cluster + SealedSecret
+│   ├── n8n-postgres/                   # CNPG Cluster + SealedSecret
+│   └── evolution-postgres/             # CNPG Cluster + SealedSecret (Evolution API)
 ├── observability/
 │   ├── prometheus/                     # kube-prometheus-stack + values + ingresses
 │   ├── loki/                           # Loki SingleBinary + values
 │   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG, etc.)
-├── automation/n8n/                     # n8n + values + ingress-public
+├── automation/
+│   ├── n8n/                            # n8n + values + ingress-public
+│   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
 ├── homelab/homepage/                   # Homepage dashboard + values + ingress-public
 └── docs/runbooks/                      # operational runbooks
 ```
@@ -103,11 +106,11 @@ homelab-k8s/
 | `argocd` | Argo CD (GitOps controller) |
 | `kube-system` | Sealed Secrets operator |
 | `cnpg-system` | CloudNativePG operator |
-| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres) |
+| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres, evolution-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
-| `automation` | n8n |
+| `automation` | n8n + evolution-api |
 | `homelab` | Homepage dashboard |
 
 ## Stack & Helm Charts
@@ -122,6 +125,7 @@ homelab-k8s/
 | Traefik | `https://helm.traefik.io/traefik` | `traefik` | `40.0.0` |
 | cloudflared | _(no Helm chart, manifest-based)_ | `cloudflare/cloudflared` image | `2024.10.0` |
 | n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `2.0.1` |
+| Evolution API | _(no Helm chart, manifest-based)_ | `evoapicloud/evolution-api` image | `v2.3.7` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
 
 ## Architecture Constraints
@@ -137,7 +141,7 @@ homelab-k8s/
 
 ## Cloudflare Tunnel routing
 
-The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Grafana, Homepage, Argo CD) and **internal via Tailscale + Traefik** (Prometheus).
+The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Evolution API, Grafana, Homepage, Argo CD) and **internal via Tailscale + Traefik** (Prometheus).
 
 ### Architecture
 
@@ -150,6 +154,7 @@ The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n,
 | Hostname | Type | Target | Proxy | Source |
 |---|---|---|---|---|
 | `n8n.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
+| `evolution.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `grafana.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
@@ -161,7 +166,7 @@ The Public Hostname rules (all → Traefik) live in the **CF dashboard**, not in
 
 ### Cloudflare Access
 
-`grafana`, `homepage` and `argocd.oscargicast.com` are protected by Self-hosted Access applications (policy: email = `oscar.gi.cast@gmail.com`). `n8n.oscargicast.com` is **not** behind Access — it has its own login. Prometheus has no Access (only reachable on tailnet).
+`grafana`, `homepage`, `argocd` and `evolution.oscargicast.com` are protected by Self-hosted Access applications (policy: email = `oscar.gi.cast@gmail.com`). `n8n.oscargicast.com` is **not** behind Access — it has its own login. Prometheus has no Access (only reachable on tailnet).
 
 ### Argo CD specifics
 
@@ -173,6 +178,20 @@ data:
 ```
 
 This makes `argocd-server` serve HTTP on its container port 8080. The Service exposes both port 80 and 443 forwarding to that same port, so the Ingress targets `argocd-server:80`. CF terminates TLS at the edge, the intra-cluster hop is HTTP. No port-forward needed anymore — drop `kubectl port-forward -n argocd svc/argocd-server :8443:443` once `argocd.oscargicast.com` is verified.
+
+### Evolution API specifics
+
+Evolution API (`evoapicloud/evolution-api:v2.3.7`) bundlea Baileys 7.0.0-rc.9, una RC con bugs conocidos que requieren tres decisiones contraintuitivas para funcionar:
+
+1. **`hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet`** — sin esto, la conexión post-QR se queda en estado "connecting" indefinidamente (la red virtual de Colima no se lleva bien con los WebSockets de larga duración que usa Baileys con WhatsApp). El pod corre en puerto `8085` directamente sobre el host de Colima (no 8080, ese lo usa Traefik vía port-forward).
+
+2. **`CACHE_REDIS_ENABLED: "false"` + `CACHE_LOCAL_ENABLED: "true"`** — Evolution API intenta conectarse a Redis por default. Sin Redis desplegado (no tenemos ni queremos), la conexión falla silenciosamente y rompe Baileys: la instancia llega a status "open" pero **no procesa mensajes/contactos/chats** (todas las métricas quedan en 0). Cambiar a cache local resuelve esto inmediatamente.
+
+3. **`LOG_LEVEL` con scopes explícitos** (`"ERROR,WARN,INFO,LOG,VERBOSE,WEBHOOKS,WEBSOCKET"`) — con `LOG_LEVEL: "WARN"` los errores de Redis se ocultan, lo que enmascara el problema #2 durante horas. Los scopes `WEBHOOKS` y `WEBSOCKET` son clave para diagnosticar problemas de delivery.
+
+Para acceso operacional: el manager UI está en `https://evolution.oscargicast.com/manager`. Login con SERVER_URL `https://evolution.oscargicast.com` + el API key (extraerlo con `kubectl -n automation get secret evolution-api-secrets -o jsonpath='{.data.api-key}' | base64 -d`). La instancia de WhatsApp se crea desde la UI con un nombre (ej. `personal`) + número en formato JID (sin `+`, sin espacios: `51907898162` para Perú). El QR aparece en el dashboard de la instancia.
+
+Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.svc.cluster.local/webhook/<UUID>`), no la URL pública — evita hairpinning innecesario por CF Tunnel. El workflow en n8n debe estar **activo** (no en test mode), porque las URLs `/webhook-test/...` son efímeras y solo responden cuando el editor está abierto.
 
 ### Pending
 
@@ -205,6 +224,15 @@ This makes `argocd-server` serve HTTP on its container port 8080. The Service ex
 | **infrastructure parent Application** | When a subdir under `infrastructure/` contains manifests beyond `application.yaml` (e.g. `infrastructure/cloudflared/deployment.yaml`), the parent in `clusters/mac-mini/infrastructure.yaml` must use `directory.include: "{**/application.yaml,argocd-config/*.yaml,namespaces/*.yaml}"`. Without that filter, the parent picks up those manifests with destination `argocd` namespace, racing the child Application. |
 | **CF Tunnel 404 diagnosis** | A `404 page not found\n` body with `content-length: 19` is Go's default `http.NotFound` — returned by both **cloudflared** (catch-all `service: http_status:404` rule) and **Traefik** (no router/endpoint match). To distinguish: `kubectl logs -n cloudflared deploy/cloudflared \| grep configuration` — if the host appears in the latest config, the 404 is from Traefik (check `kubectl describe ingress` for empty `Backends`). If the host is absent, it's cloudflared's catch-all (re-add the Public Hostname in CF dashboard). |
 | **Argo CD `argocd-cmd-params-cm`** | Changes to this ConfigMap (e.g. flipping `server.insecure: "true"`) **do NOT auto-restart `argocd-server`**. The pod reads params only at startup. Symptom: applied via GitOps but pod still serves with old settings (e.g. HTTPS in non-insecure mode → infinite-redirect loop behind a TLS-terminating tunnel). Fix: `kubectl rollout restart deployment/argocd-server -n argocd`. Verify the new pod logs show `tls: false` to confirm insecure mode is active. |
+| **Evolution API v2.3.7** | Requires `CACHE_REDIS_ENABLED: "false"` + `CACHE_LOCAL_ENABLED: "true"`. Without these, Evolution tries to connect to a non-existent Redis and **silently breaks Baileys message processing**. Symptom: instance status "open" but `Messages/Contacts/Chats = 0` in metrics, no webhooks fire. Errors `redis disconnected` only show with `LOG_LEVEL` including `ERROR` scope (NOT shown with bare `LOG_LEVEL: "WARN"`). |
+| **Evolution API v2.3.7** | Requires `hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet`. Without hostNetwork, the post-QR connection gets stuck in "connecting" indefinitely — Baileys 7.0.0-rc.9 doesn't survive Colima's virtual network stack for long-lived WhatsApp WebSockets. |
+| **Evolution API v2.3.7** | Port is configured via `SERVER_PORT` env var (NOT `PORT`). With `hostNetwork: true`, use 8085 — port 8080 is occupied by Traefik's port-forward on the host. Service + Ingress targetPort must match. |
+| **Evolution API v2.3.7** | `LOG_LEVEL: "WARN"` alone hides critical Redis errors. Use explicit scopes list: `"ERROR,WARN,INFO,LOG,VERBOSE,WEBHOOKS,WEBSOCKET"`. Valid scopes: `ERROR, WARN, DEBUG, INFO, LOG, VERBOSE, DARK, WEBHOOKS, WEBSOCKET`. Without `WEBHOOKS` scope, webhook delivery attempts are invisible. |
+| **Evolution API v2.3.7** | `PROMETHEUS_METRICS: "true"` + `METRICS_AUTH_REQUIRED: "false"` enables `/metrics`. Without both, the endpoint returns 404. ServiceMonitor selector matches by label `app.kubernetes.io/name: evolution-api` on the Service (already set). Exposed metrics: `evolution_instances_total`, `evolution_instance_up`, `evolution_instance_state`. |
+| **Evolution API v2.3.7** | Phone numbers for the API (instance creation, send message) are entered **without `+`**, **without spaces**, **without dashes**. Just country code + number. Example for Peru: `51907898162`. Internal JID format: `<número>@s.whatsapp.net`. |
+| **Evolution API v2.3.7** | Changing image version (even patch) requires full DB wipe with `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` on the `evolution` database — Prisma migrations don't tolerate cross-version downgrades, and the bundled Baileys keeps stale crypto session state. Run from `psql` against `evolution-postgres-rw.databases.svc.cluster.local:5432`. |
+| **Evolution API v2.3.7** | Stream error code 515 after QR scan is **NORMAL** — WhatsApp asks the client to restart with saved creds. The reconnection is automatic. Don't try to "fix" the 515 itself; verify instead that messages flow afterwards (`evolution_instance_up = 1` and message count grows). |
+| **n8n webhooks from cluster** | When Evolution API (or any cluster workload) needs to call n8n webhooks, use internal DNS: `http://n8n.automation.svc.cluster.local/webhook/<UUID>` — NOT the public URL (`https://n8n.oscargicast.com/webhook/...`), which would hairpin through CF Tunnel needlessly. The `webhook-test/...` URLs are ephemeral and only respond while the n8n editor is open; production needs `/webhook/...` and the workflow must be active. |
 
 ## Cluster Management Commands
 
