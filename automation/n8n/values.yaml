@@ -21,6 +21,10 @@ main:
       value: "true"
     WEBHOOK_URL:
       value: "https://n8n.oscargicast.com/"
+    GENERIC_TIMEZONE:
+      value: "America/Lima"
+    TZ:
+      value: "America/Lima"
     DB_POSTGRESDB_PASSWORD:
       valueFrom:
         secretKeyRef:
