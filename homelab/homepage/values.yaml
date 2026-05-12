@@ -251,9 +251,19 @@ config:
             description: Cache dedicado para Infisical
             icon: redis.png
             widget:
-              type: redis
-              url: redis://infisical-redis.infisical.svc.cluster.local:6379
-              password: "{{HOMEPAGE_VAR_REDIS_PASSWORD}}"
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Estado
+                  query: sum(kube_pod_status_phase{namespace="infisical",pod=~"infisical-redis-.*",phase="Running"})
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="infisical",pod=~"infisical-redis-.*"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="infisical",pod=~"infisical-redis-.*"}[5m]))
+                  format:
+                    type: percent
     - Red:
         - Speedtest:
             href: "https://speedtest.oscargicast.com/"
