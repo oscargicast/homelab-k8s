@@ -25,6 +25,24 @@ main:
       value: "America/Lima"
     TZ:
       value: "America/Lima"
+    N8N_METRICS:
+      value: "true"
+    N8N_METRICS_INCLUDE_DEFAULT_METRICS:
+      value: "true"
+    N8N_METRICS_INCLUDE_CACHE_METRICS:
+      value: "true"
+    N8N_METRICS_INCLUDE_MESSAGE_EVENT_BUS_METRICS:
+      value: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL:
+      value: "true"
+    N8N_METRICS_INCLUDE_API_ENDPOINTS:
+      value: "true"
+    N8N_METRICS_INCLUDE_API_PATH_LABEL:
+      value: "true"
+    N8N_METRICS_INCLUDE_API_METHOD_LABEL:
+      value: "true"
+    N8N_METRICS_INCLUDE_API_STATUS_CODE_LABEL:
+      value: "true"
     DB_POSTGRESDB_PASSWORD:
       valueFrom:
         secretKeyRef:
