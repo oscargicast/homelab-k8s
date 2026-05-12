@@ -21,7 +21,7 @@ spec:
       targetRevision: HEAD
       path: automation/n8n
       directory:
-        include: "{sealed-secret.yaml,ingress-public.yaml,service-monitor.yaml}"
+        include: "{sealed-secret.yaml,infisical-secret.yaml,ingress-public.yaml,service-monitor.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: automation
