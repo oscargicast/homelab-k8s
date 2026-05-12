@@ -169,13 +169,18 @@ Tras login admin en `https://infisical.oscargicast.com`:
 
 - [ ] **B1.** Signup como primer admin (email `oscar.gi.cast@gmail.com`).
 - [ ] **B2.** Crear **Organization** `homelab` → **Project** `homelab-k8s` → **Environment** `prod`.
-- [ ] **B3.** Crear folders (replicar la estructura del repo):
-  - `/automation/n8n`
-  - `/automation/evolution-api`
-  - `/databases/n8n-postgres`
-  - `/databases/postgres-lab`
-  - `/databases/evolution-postgres`
-  - `/infrastructure/cloudflared`
+- [ ] **B3.** Crear folders (replicar la estructura del repo). Importante: la UI **no acepta paths con `/`** en el name (validación `[a-zA-Z0-9_-]`). Hay que crear cada segmento por separado, navegando dentro del folder padre antes de crear el hijo:
+
+  | Crear en root | Después dentro de | Path final (para CRs) |
+  |---|---|---|
+  | folder `automation` | crear `n8n` | `/automation/n8n` |
+  | (mismo `automation`) | crear `evolution-api` | `/automation/evolution-api` |
+  | folder `databases` | crear `n8n-postgres` | `/databases/n8n-postgres` |
+  | (mismo `databases`) | crear `postgres-lab` | `/databases/postgres-lab` |
+  | (mismo `databases`) | crear `evolution-postgres` | `/databases/evolution-postgres` |
+  | folder `infrastructure` | crear `cloudflared` | `/infrastructure/cloudflared` |
+
+  La notación con `/` (ej. `/automation/n8n`) se usa **solo** en el campo `secretsPath` del `InfisicalSecret` CR — ahí Infisical sí parsea la ruta nested.
 - [ ] **B4.** Crear **Machine Identity** `k8s-operator`:
   - Auth Method: **Kubernetes Auth**.
   - Kubernetes Host: `https://kubernetes.default.svc` (default).
