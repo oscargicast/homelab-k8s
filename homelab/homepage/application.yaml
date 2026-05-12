@@ -21,7 +21,7 @@ spec:
       targetRevision: HEAD
       path: homelab/homepage
       directory:
-        include: "{ingress-public.yaml,sealed-secret-widget-secrets.yaml,infisical-secret.yaml}"
+        include: "{ingress-public.yaml,infisical-secret.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: homelab

@@ -12,7 +12,7 @@ spec:
     targetRevision: HEAD
     path: homelab/speedtest-tracker
     directory:
-      include: "{pvc.yaml,deployment.yaml,service.yaml,sealed-secret.yaml,infisical-secret.yaml,ingress-internal.yaml,service-monitor.yaml}"
+      include: "{pvc.yaml,deployment.yaml,service.yaml,infisical-secret.yaml,ingress-internal.yaml,service-monitor.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: homelab
