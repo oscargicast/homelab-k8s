@@ -132,7 +132,7 @@ homelab-k8s/
 
 - **Single-node cluster** — no real HA. PVCs use `local-path` StorageClass.
 - All persistent services must have PVCs with `storageClass: local-path`.
-- Colima has 8 GB RAM allocated; apply resource limits to every workload.
+- Colima has 10 GB RAM allocated; apply resource limits to every workload.
 - `ServerSideApply=true` required for kube-prometheus-stack (large CRDs).
 - Multi-source Applications (`sources:` plural) require Argo CD ≥ 2.6.
 - ArgoCD initial install must use `kubectl apply --server-side` to avoid annotation-too-long errors on CRDs.
