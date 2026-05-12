@@ -17,19 +17,31 @@ resources:
     cpu: 100m
 
 config:
+  settings:
+    title: "Homelab"
+    theme: dark
+    color: slate
+    headerStyle: clean
+    background:
+      image: https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2560&q=80
+      blur: sm
+      brightness: 50
+      opacity: 60
+    layout:
+      Cluster:
+        style: row
+        columns: 2
+      Automatización:
+        style: row
+        columns: 2
+      Observabilidad:
+        style: row
+        columns: 2
+      Databases:
+        style: row
+        columns: 3
   kubernetes:
     mode: cluster
-  bookmarks:
-    - Observabilidad:
-        - Grafana:
-            - href: "https://grafana.oscargicast.com"
-              description: Métricas y logs
-        - Prometheus:
-            - href: "http://prometheus.oscargicast.com:8080/"
-              description: Prometheus UI
-        - CNPG Dashboard:
-            - href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg"
-              description: PostgreSQL operator dashboard
   services:
     - Cluster:
         - Overview:
@@ -68,10 +80,85 @@ config:
             href: "https://n8n.oscargicast.com/"
             description: Workflows
             icon: n8n.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"n8n-.*",container="n8n"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"n8n-.*",container="n8n"}[5m]))
+                  format:
+                    type: percent
+                - label: Heap n8n
+                  query: sum(nodejs_heap_size_used_bytes{job="n8n"})
+                  format:
+                    type: bytes
+                - label: Eventloop lag
+                  query: max(nodejs_eventloop_lag_seconds{job="n8n"})
+                  format:
+                    type: duration
         - Evolution API:
-            href: "https://evolution.oscargicast.com"
+            href: "https://evolution.oscargicast.com/manager/"
             description: WhatsApp API
             icon: whatsapp.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Instancias
+                  query: evolution_instances_total
+                - label: Estado
+                  query: max(evolution_instance_up)
+                  format:
+                    type: number
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"evolution-api-.*",container="evolution-api"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"evolution-api-.*",container="evolution-api"}[5m]))
+                  format:
+                    type: percent
+    - Observabilidad:
+        - Grafana:
+            href: "https://grafana.oscargicast.com"
+            description: Dashboards y logs
+            icon: grafana.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Estado
+                  query: max(up{job="prometheus-kube-prometheus-grafana"})
+                  format:
+                    type: number
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="observability",pod=~"prometheus-kube-prometheus-grafana-.*",container="grafana"})
+                  format:
+                    type: bytes
+                - label: Dashboards
+                  query: max(grafana_stat_totals_dashboard)
+        - Prometheus:
+            href: "https://grafana.oscargicast.com/explore"
+            description: Métricas time-series
+            icon: prometheus.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Targets up
+                  query: count(up == 1)
+                - label: Alertas activas
+                  query: sum(ALERTS{alertstate="firing"}) or vector(0)
+                - label: Series
+                  query: prometheus_tsdb_head_series
+                - label: Storage
+                  query: sum(prometheus_tsdb_storage_blocks_bytes)
+                  format:
+                    type: bytes
     - Databases:
         - postgres-lab:
             description: CNPG cluster general purpose
@@ -140,9 +227,6 @@ config:
         uptime: true
         disk: /
         label: System
-    - search:
-        provider: duckduckgo
-        target: _blank
     - datetime:
         text_size: xl
         format:
