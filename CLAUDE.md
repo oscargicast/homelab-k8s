@@ -95,7 +95,9 @@ homelab-k8s/
 ├── automation/
 │   ├── n8n/                            # n8n + values + ingress-public
 │   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
-├── homelab/homepage/                   # Homepage dashboard + values + ingress-public
+├── homelab/
+│   ├── homepage/                       # values + ingress-public + sealed-secret-widget-secrets
+│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + 2 SealedSecrets
 └── docs/runbooks/                      # operational runbooks
 ```
 

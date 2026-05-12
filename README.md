@@ -19,7 +19,7 @@ graph TD
     K8S --> NS_TRA[traefik<br/><i>Ingress controller por Host</i>]
     K8S --> NS_CFD[cloudflared<br/><i>Cloudflare Tunnel connector</i>]
     K8S --> NS_AUT[automation<br/><i>n8n + evolution-api</i>]
-    K8S --> NS_HL[homelab<br/><i>Homepage dashboard</i>]
+    K8S --> NS_HL[homelab<br/><i>Homepage + Speedtest Tracker</i>]
 ```
 
 ## Cómo se accede a cada servicio
@@ -44,6 +44,7 @@ graph LR
         HOM[homepage.homelab:3000]
         ARGO[argocd-server.argocd:80]
         PROM[prometheus...:9090]
+        SPD[speedtest-tracker.homelab:80]
     end
 
     USR_EXT -->|n8n.oscargicast.com| EDGE
@@ -61,8 +62,10 @@ graph LR
     TRA --> ARGO
 
     USR_INT -->|prometheus.oscargicast.com:8080<br/>CNAME→tailscale| PF8080
+    USR_INT -->|speedtest.oscargicast.com<br/>CNAME→tailscale| PF8080
     PF8080 --> TRA
     TRA --> PROM
+    TRA --> SPD
 ```
 
 ## Cómo funciona el GitOps
@@ -96,6 +99,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | n8n | Automatización de workflows | `automation` |
 | Evolution API | API de WhatsApp Web (integración con n8n) | `automation` |
 | Homepage | Dashboard visual del homelab | `homelab` |
+| Speedtest Tracker | Monitor de velocidad/latencia ISP (SQLite, scrape Prometheus) | `homelab` |
 
 ## Estructura del repo
 
@@ -124,7 +128,9 @@ homelab-k8s/
 ├── automation/
 │   ├── n8n/                            # values.yaml + ingress-public.yaml
 │   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
-├── homelab/homepage/                   # values.yaml + ingress-public.yaml
+├── homelab/
+│   ├── homepage/                       # values.yaml + ingress-public.yaml + sealed-secret-widget-secrets.yaml
+│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + 2 SealedSecrets
 └── docs/runbooks/                      # runbooks de operación
 ```
 
@@ -173,6 +179,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | Homepage | `https://homepage.oscargicast.com` | Público + Cloudflare Access |
 | Argo CD | `https://argocd.oscargicast.com` | Público + Cloudflare Access (+ admin password de Argo CD) |
 | Prometheus | `http://prometheus.oscargicast.com:8080` | Solo tailnet (CNAME→Tailscale) |
+| Speedtest Tracker | `https://speedtest.oscargicast.com` | Solo tailnet (CNAME→Tailscale) |
 
 Los públicos pasan por **Cloudflare Tunnel** (cloudflared corriendo en cluster con conexión saliente a CF edge), TLS terminado en CF, sin abrir puertos en la red.
 
@@ -181,8 +188,6 @@ Para Prometheus (interno por tailnet) hay que tener corriendo el port-forward de
 ```bash
 kubectl port-forward -n traefik svc/traefik --address 0.0.0.0 8080:80
 ```
-
-> Argo CD ya **no** requiere port-forward — pasó a estar detrás de CF Tunnel + Access en `argocd.oscargicast.com`. El argocd-server corre con `server.insecure: true` (sirve HTTP plano internamente; CF termina TLS al edge).
 
 Password inicial de Argo CD:
 
@@ -201,6 +206,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Public Hostname del tunnel |
 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (no debe estar proxied — IP Tailscale es privada) |
+| `speedtest.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (no debe estar proxied — IP Tailscale es privada) |
 
 ## Recursos del cluster
 
@@ -219,4 +225,5 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 - [`docs/runbooks/evolution-api-setup.md`](docs/runbooks/evolution-api-setup.md) — runbook para desplegar Evolution API + WhatsApp + n8n
 - [`docs/runbooks/secrets-cheatsheet.md`](docs/runbooks/secrets-cheatsheet.md) — comandos para extraer secrets del cluster
 - [`docs/runbooks/db-access.md`](docs/runbooks/db-access.md) — acceso a las DBs CNPG vía port-forward + Tailscale
+- [`docs/runbooks/speedtest-tracker-setup.md`](docs/runbooks/speedtest-tracker-setup.md) — runbook para desplegar speedtest-tracker + widget Homepage (3 tokens distintos)
 - [`CLAUDE.md`](CLAUDE.md) — guía operativa completa con gotchas por chart
