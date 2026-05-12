@@ -262,16 +262,43 @@ config:
     - Personal:
         - GitHub:
             href: "https://github.com/oscargicast"
-            description: Contribution heatmap
+            description: "@oscargicast"
+            icon: github.png
+            widget:
+              type: customapi
+              url: https://api.github.com/users/oscargicast
+              refreshInterval: 600000
+              method: GET
+              mappings:
+                - field: followers
+                  label: Followers
+                  format: number
+                - field: public_repos
+                  label: Repos
+                  format: number
+                - field: public_gists
+                  label: Gists
+                  format: number
+                - field: created_at
+                  label: Since
+                  format: date
+                  dateStyle: short
+        - Heatmap:
+            href: "https://github.com/oscargicast"
+            description: Contribution graph (último año)
             icon: github.png
             widget:
               type: iframe
               name: GitHub Contributions
-              src: https://ghchart.rshah.org/oscargicast
-              classes: h-32 w-full
+              src: https://ghchart.rshah.org/38bdf8/oscargicast
+              classes: h-44 w-full
               referrerPolicy: no-referrer
               allowScrolling: "no"
               loadingStrategy: eager
+        - Web personal:
+            href: "https://oscargicast.com"
+            description: Sitio personal
+            icon: mdi-web
   widgets:
     - resources:
         backend: kubernetes
