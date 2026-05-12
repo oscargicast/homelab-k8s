@@ -21,7 +21,7 @@ spec:
       targetRevision: HEAD
       path: observability/prometheus
       directory:
-        include: "{grafana-ingress.yaml,prometheus-ingress.yaml}"
+        include: "{grafana-ingress.yaml,grafana-internal-ingress.yaml,prometheus-ingress.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
