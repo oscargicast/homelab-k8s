@@ -9,26 +9,31 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
-    chart: secrets-operator
-    targetRevision: 0.10.33
-    helm:
-      values: |
-        installCRDs: true
-        hostAPI: "http://infisical.infisical.svc.cluster.local:8080/api"
-        controllerManager:
-          serviceAccount:
-            create: true
-            name: "infisical-operator-controller-manager"
-          manager:
-            resources:
-              requests:
-                cpu: 10m
-                memory: 64Mi
-              limits:
-                memory: 128Mi
-          replicas: 1
+  sources:
+    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+      chart: secrets-operator
+      targetRevision: 0.10.33
+      helm:
+        values: |
+          installCRDs: true
+          hostAPI: "http://infisical.infisical.svc.cluster.local:8080/api"
+          controllerManager:
+            serviceAccount:
+              create: true
+              name: "infisical-operator-controller-manager"
+            manager:
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  memory: 128Mi
+            replicas: 1
+    - repoURL: https://github.com/oscargicast/homelab-k8s.git
+      targetRevision: HEAD
+      path: infrastructure/infisical-operator
+      directory:
+        include: "{sa-token.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: infisical-operator
@@ -39,3 +44,14 @@ spec:
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+  # El SA `infisical-operator-controller-manager` se patchea post-deploy
+  # con `.secrets: [{name: infisical-operator-controller-manager-token}]` para
+  # vincularlo al Secret legacy (K8s 1.24+ no auto-vincula). Sin este ignore,
+  # selfHeal removería el patch. Ver sa-token.yaml para el contexto completo.
+  ignoreDifferences:
+    - group: ""
+      kind: ServiceAccount
+      name: infisical-operator-controller-manager
+      namespace: infisical-operator
+      jsonPointers:
+        - /secrets

@@ -1,0 +1,29 @@
+---
+# Legacy ServiceAccount token Secret para Infisical Secrets Operator.
+#
+# Background: el operator v0.10.x autentica con Infisical via Kubernetes Auth
+# (Machine Identity), y para eso necesita un JWT firmado por el cluster.
+# Internamente busca ese JWT en el campo .secrets[] del ServiceAccount
+# 'infisical-operator-controller-manager'.
+#
+# En Kubernetes >= 1.24 los SA YA NO generan automáticamente un Secret tipo
+# 'kubernetes.io/service-account-token' al crearse — el patrón moderno es
+# pedirlos on-demand vía la TokenRequest API (TTL acotado). Esta versión del
+# operator todavía depende del patrón legacy, así que hay que crear el Secret
+# a mano y vincularlo al SA.
+#
+# Este YAML crea el Secret; K8s auto-llena .data.token con un JWT no-expirable
+# firmado por el cluster CA. Falta además el patch al SA (.secrets[]) — se
+# hace una sola vez post-deploy (ver post-deploy block más abajo o
+# docs/runbooks/infisical-migration.md sección "Bootstrap del SA token").
+#
+# Cuando Infisical libere una versión que use TokenRequest API, este Secret +
+# el patch al SA + el ignoreDifferences en application.yaml se pueden borrar.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infisical-operator-controller-manager-token
+  namespace: infisical-operator
+  annotations:
+    kubernetes.io/service-account.name: infisical-operator-controller-manager
+type: kubernetes.io/service-account-token
