@@ -27,6 +27,8 @@ spec:
                   secretKeyRef:
                     name: infisical-redis-auth
                     key: REDIS_URL
+              - name: SITE_URL
+                value: "https://infisical.oscargicast.com"
             resources:
               requests:
                 cpu: 100m
