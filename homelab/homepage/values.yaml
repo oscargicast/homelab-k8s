@@ -248,17 +248,13 @@ config:
         uptime: true
         disk: /
         label: System
-    - glances:
-        # IP Tailscale del Mac mini host (CoreDNS del cluster no resuelve MagicDNS).
-        url: http://100.97.206.96:61208
-        version: 4
-        cpu: true
-        mem: true
-        uptime: true
-        disk: /
-        label: "Mac mini"
-        chart: false
-        expanded: true
+    - iframe:
+        name: Monitoring
+        src: https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring?orgId=1&theme=dark&kiosk=tv&refresh=30s
+        classes: h-[480px] w-full
+        referrerPolicy: no-referrer
+        allowScrolling: "no"
+        loadingStrategy: lazy
     - datetime:
         text_size: xl
         format:
