@@ -110,7 +110,7 @@ homelab-k8s/
 | `argocd` | Argo CD (GitOps controller) |
 | `kube-system` | Sealed Secrets operator |
 | `cnpg-system` | CloudNativePG operator |
-| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres, evolution-postgres) |
+| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres, evolution-postgres, infisical-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
@@ -230,6 +230,7 @@ Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.sv
 | **kube-prometheus-stack 67.x+** | Several high-cardinality metrics are dropped by default: `apiserver_request_sli_duration_seconds_bucket`, `apiserver_request_slo_duration_seconds_bucket`, `etcd_request_duration_seconds_bucket`, `csi_operations_seconds_bucket`, `storage_operation_duration_seconds_bucket`, `container_memory_failures_total{scope="hierarchy"}`, and `container_network_*` (CNI interfaces). If a dashboard or alert breaks after upgrading, check whether it queries one of these. |
 | **CloudNativePG 0.28.x** | The operator chart does NOT ship a Grafana dashboard ConfigMap — the `monitoring.grafanaDashboard.create` value lives in the `cluster` subchart only. To get the dashboard, sideload a manual ConfigMap with the JSON from grafana.com (ID `20417`, dashboard UID `cloudnative-pg`) labeled `grafana_dashboard: "1"` in the `observability` namespace so Grafana's sidecar picks it up. |
 | **CloudNativePG 0.28.x** | Set `spec.monitoring.enablePodMonitor: true` on each `Cluster` resource to expose metrics on port 9187 and emit a `PodMonitor` (which Prometheus needs the relaxed selectors above to discover). |
+| **CloudNativePG (any version)** | **Pinear `spec.imageName` siempre.** Sin pin, el cluster hereda el default del operator, que cambia con cada bump del chart. CNPG NO ejecuta `pg_upgrade` automático — cuando el operator suba a un major nuevo (PG 19, etc.), los pods intentan arrancar el binario nuevo sobre PGDATA del major anterior y entran en CrashLoopBackOff. Pin a un tag rolling de minor específico (`ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie`) o un digest exacto. Major upgrades = dump/restore manual deliberado. |
 | **loki 13.x** | `loki.schemaConfig` is required — the chart refuses to render without it. Use schema `v13` / store `tsdb`. |
 | **loki 13.x** | `chunksCache.enabled: false` and `resultsCache.enabled: false` are needed on single-node (memcached StatefulSets exhaust RAM). |
 | **loki chart repo split (2026-03)** | The Grafana-maintained `grafana.github.io/helm-charts` `loki` chart is now GEL-only from `7.0.0` onward. OSS users moved to the community fork at `grafana-community.github.io/helm-charts` (forked at `6.55.0`, now on `13.x`). When upgrading from a stale `6.*` pin, change BOTH `repoURL` AND `targetRevision` in the same commit; the values schema is compatible. |
