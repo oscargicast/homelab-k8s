@@ -28,10 +28,10 @@ spec:
                     key: REDIS_URL
             resources:
               requests:
-                cpu: 50m
-                memory: 200Mi
+                cpu: 100m
+                memory: 400Mi
               limits:
-                memory: 512Mi
+                memory: 1200Mi
           ingress:
             enabled: false
             nginx:
