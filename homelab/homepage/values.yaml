@@ -47,7 +47,7 @@ config:
         columns: 3
       Personal:
         style: row
-        columns: 2
+        columns: 1
   kubernetes:
     mode: cluster
   services:
@@ -238,18 +238,6 @@ config:
               referrerPolicy: no-referrer
               allowScrolling: "no"
               loadingStrategy: eager
-        - Stats:
-            href: "https://github.com/oscargicast"
-            description: Commits, streak, lenguajes
-            icon: github.png
-            widget:
-              type: iframe
-              name: GitHub Stats
-              src: https://github-readme-stats.vercel.app/api?username=oscargicast&show_icons=true&theme=transparent&hide_border=true
-              classes: h-40 w-full
-              referrerPolicy: no-referrer
-              allowScrolling: "no"
-              loadingStrategy: eager
   widgets:
     - resources:
         backend: kubernetes
@@ -260,6 +248,17 @@ config:
         uptime: true
         disk: /
         label: System
+    - glances:
+        # IP Tailscale del Mac mini host (CoreDNS del cluster no resuelve MagicDNS).
+        url: http://100.97.206.96:61208
+        version: 4
+        cpu: true
+        mem: true
+        uptime: true
+        disk: /
+        label: "Mac mini"
+        chart: false
+        expanded: true
     - datetime:
         text_size: xl
         format:
@@ -273,18 +272,6 @@ config:
         timezone: America/Lima
         units: metric
         cache: 5
-    - glances:
-        # IP Tailscale del Mac mini host (CoreDNS del cluster no resuelve MagicDNS).
-        url: http://100.97.206.96:61208
-        version: 4
-        cpu: true
-        mem: true
-        cputemp: true
-        uptime: true
-        disk: /
-        label: "Mac mini"
-        chart: false
-        expanded: true
     - kubernetes:
         cluster:
           show: true
