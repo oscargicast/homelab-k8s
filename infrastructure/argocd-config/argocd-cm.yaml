@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    # Con SSA cada field-manager solo "posee" las keys que declara.
+    # Sin esto, kubectl apply borraría las resource.customizations.* y
+    # resource.exclusions seteadas por el install bootstrap.
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+data:
+  # Cuenta local con login web + tokens para argocd CLI.
+  # Nombre sin '.' ni '@' — argocd parsea las keys como accounts.<name>.<field>.
+  accounts.oscargicast: "apiKey, login"
+  accounts.oscargicast.enabled: "true"
