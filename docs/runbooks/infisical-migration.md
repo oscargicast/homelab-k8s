@@ -211,14 +211,44 @@ Orden (menos crítico → más crítico):
 
 Para cada uno, repetir estos 6 pasos:
 
-#### C1. Extraer el valor actual del SealedSecret (Mac mini)
+#### C1. Extraer el valor actual del SealedSecret
+
+Patrón: ejecutar desde la **MacBook**, con SSH a la Mac mini + `pbcopy` para que el valor vaya directo al clipboard del Mac y de ahí a la UI de Infisical (sin pasar por el terminal ni quedar en el history en claro).
 
 ```bash
-# Ejemplo para n8n-db-credentials
-kubectl -n automation get secret n8n-db-credentials -o jsonpath='{.data.password}' | base64 -d; echo
+# Patrón genérico
+ssh macmini 'zsh -lc "kubectl -n <ns> get secret <name> -o jsonpath={.data.<key>} | base64 -d"' | pbcopy
 ```
 
-(Ver `docs/runbooks/secrets-cheatsheet.md` para los comandos por secret.)
+> `zsh -lc` carga el profile de la Mac mini para que `kubectl` esté en el PATH (en sesión SSH no-interactiva por default no lo está). Sin `; echo` — el newline trailing ensucia el clipboard al pegar.
+
+Comandos por secret (uno por key, ejecutar uno-a-uno y pegar en la UI antes del siguiente):
+
+```bash
+# 1. n8n-db-credentials → folder /automation/n8n
+ssh macmini 'zsh -lc "kubectl -n automation get secret n8n-db-credentials -o jsonpath={.data.password} | base64 -d"' | pbcopy
+
+# 2. evolution-api-secrets → folder /automation/evolution-api
+ssh macmini 'zsh -lc "kubectl -n automation get secret evolution-api-secrets -o jsonpath={.data.api-key} | base64 -d"' | pbcopy
+ssh macmini 'zsh -lc "kubectl -n automation get secret evolution-api-secrets -o jsonpath={.data.database-url} | base64 -d"' | pbcopy
+
+# 3. n8n-db-user → folder /databases/n8n-postgres
+ssh macmini 'zsh -lc "kubectl -n databases get secret n8n-db-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
+ssh macmini 'zsh -lc "kubectl -n databases get secret n8n-db-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
+
+# 4. postgres-lab-app-user → folder /databases/postgres-lab
+ssh macmini 'zsh -lc "kubectl -n databases get secret postgres-lab-app-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
+ssh macmini 'zsh -lc "kubectl -n databases get secret postgres-lab-app-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
+
+# 5. evolution-db-user → folder /databases/evolution-postgres
+ssh macmini 'zsh -lc "kubectl -n databases get secret evolution-db-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
+ssh macmini 'zsh -lc "kubectl -n databases get secret evolution-db-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
+
+# 6. cloudflared-token → folder /infrastructure/cloudflared
+ssh macmini 'zsh -lc "kubectl -n cloudflared get secret cloudflared-token -o jsonpath={.data.token} | base64 -d"' | pbcopy
+```
+
+(Ver `docs/runbooks/secrets-cheatsheet.md` para la variante que imprime el valor en terminal en vez de copiarlo al clipboard.)
 
 #### C2. Subir el valor a Infisical UI
 
