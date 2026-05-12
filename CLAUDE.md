@@ -26,48 +26,45 @@ The only manual `kubectl apply` is the bootstrap:
 kubectl apply -f bootstrap/argocd/root-app.yaml
 ```
 
-## Secrets — Sealed Secrets
+## Secrets — Infisical
 
-> **En migración a Infisical (self-hosted).** El stack de Bitnami Sealed Secrets sigue operativo durante la transición gradual de los 6 secretos vivos. Ver `docs/runbooks/infisical-migration.md` para el plan completo y el orden de migración. Una vez completada, esta sección será reescrita y la tabla de namespaces/stack actualizada para reflejar Infisical como fuente de verdad.
+Los secretos viven en **Infisical self-hosted** (`https://infisical.oscargicast.com`). Los valores se editan en la UI; el repo solo contiene `InfisicalSecret` CRs (punteros, sin valores) que el **Infisical Secrets Operator** materializa como `Secret` nativos en ≤60s.
 
 **Never commit plaintext secrets.** `.gitignore` blocks `**/secret.yaml`.
 
-Workflow to add/update a secret:
-```bash
-# 1. Create plaintext secret in /tmp (never in repo)
-cat > /tmp/my-secret.yaml << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-  namespace: target-namespace
-type: kubernetes.io/basic-auth
-stringData:
-  username: user
-  password: password-here
-EOF
+Workflow para agregar/editar un secreto:
 
-# 2. Seal with cluster's public cert (run on Mac mini to get cert first)
-kubeseal \
-  --cert ~/.config/homelab-k8s-sealed-secrets-pub.pem \
-  --format yaml \
-  < /tmp/my-secret.yaml \
-  > path/to/sealed-secret.yaml
+1. **Crear/editar el valor en Infisical UI** (`https://infisical.oscargicast.com`, project `homelab-k8s`, env `prod`, ruta lógica `/<area>/<service>` — p. ej. `/automation/n8n`).
+2. **Commitear el `InfisicalSecret` CR** apuntando a esa ruta. Ejemplo real (`automation/n8n/infisical-secret.yaml`):
 
-# 3. Commit the sealed-secret.yaml (safe to commit)
-git add path/to/sealed-secret.yaml && git commit -m "feat: add sealed secret"
+   ```yaml
+   apiVersion: secrets.infisical.com/v1alpha1
+   kind: InfisicalSecret
+   metadata:
+     name: n8n-db-credentials
+     namespace: automation
+   spec:
+     resyncInterval: 60
+     authentication:
+       kubernetesAuth:
+         identityId: <machine-identity-uuid>
+         serviceAccountRef:
+           name: infisical-operator-controller-manager
+           namespace: infisical-operator
+         secretsScope:
+           projectSlug: homelab-k8s
+           envSlug: prod
+           secretsPath: /automation/n8n
+     managedSecretReference:
+       secretName: n8n-db-credentials
+       secretNamespace: automation
+       creationPolicy: Owner
+   ```
 
-# 4. Delete the plaintext
-rm /tmp/my-secret.yaml
-```
+3. **Incluir el archivo en el `directory.include` del Application** del servicio (ver `automation/n8n/application.yaml`).
+4. Push → ArgoCD aplica el CR → operator lee Infisical → escribe `Secret` nativo en el namespace destino. Editar el valor después solo requiere tocar la UI; no hay commit.
 
-Get the cluster cert (run on Mac mini):
-```bash
-kubeseal --fetch-cert \
-  --controller-namespace kube-system \
-  --controller-name sealed-secrets-controller \
-  > ~/.config/homelab-k8s-sealed-secrets-pub.pem
-```
+> Sealed Secrets operator sigue desplegado en `kube-system` por seguridad histórica, pero **no hay `SealedSecret` CRs en Git**. Migración completada — ver `docs/runbooks/infisical-migration.md` para detalles del rollout y el bootstrap (`infisical-bootstrap` Secret + Machine Identity en `infisical-operator`).
 
 ## Repository Structure
 
@@ -81,25 +78,29 @@ homelab-k8s/
 │   └── observability.yaml             # prometheus + loki
 ├── infrastructure/
 │   ├── namespaces/                     # Namespace CRs
-│   ├── sealed-secrets/application.yaml # Sealed Secrets operator
+│   ├── sealed-secrets/application.yaml # legacy operator (sin CRs vivos en Git)
+│   ├── infisical/                      # Infisical backend (self-hosted) + ingress
+│   ├── infisical-operator/             # Infisical Secrets Operator + sa-token
+│   ├── redis/                          # Redis dedicado para Infisical
 │   ├── cloudnative-pg/application.yaml # CNPG operator
 │   ├── traefik/application.yaml        # Traefik ingress controller
-│   ├── cloudflared/                    # CF Tunnel: deployment + sealed-secret + Application
+│   ├── cloudflared/                    # CF Tunnel: deployment + InfisicalSecret + Application
 │   └── argocd-config/params-cm.yaml    # argocd-cmd-params-cm overrides
 ├── databases/
-│   ├── postgres-lab/                   # CNPG Cluster + SealedSecret
-│   ├── n8n-postgres/                   # CNPG Cluster + SealedSecret
-│   └── evolution-postgres/             # CNPG Cluster + SealedSecret (Evolution API)
+│   ├── postgres-lab/                   # CNPG Cluster + InfisicalSecret
+│   ├── n8n-postgres/                   # CNPG Cluster + InfisicalSecret
+│   ├── evolution-postgres/             # CNPG Cluster + InfisicalSecret (Evolution API)
+│   └── infisical-postgres/             # CNPG Cluster (Infisical backend DB)
 ├── observability/
 │   ├── prometheus/                     # kube-prometheus-stack + values + ingresses
 │   ├── loki/                           # Loki SingleBinary + values
 │   └── grafana-dashboards/             # ConfigMaps con dashboards (CNPG, etc.)
 ├── automation/
-│   ├── n8n/                            # n8n + values + ingress-public
-│   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
+│   ├── n8n/                            # n8n + values + ingress-public + InfisicalSecret
+│   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor + InfisicalSecret
 ├── homelab/
-│   ├── homepage/                       # values + ingress-public + sealed-secret-widget-secrets
-│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + 2 SealedSecrets
+│   ├── homepage/                       # values + ingress-public + InfisicalSecret
+│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + InfisicalSecret
 └── docs/runbooks/                      # operational runbooks
 ```
 
@@ -108,7 +109,7 @@ homelab-k8s/
 | Namespace | Purpose |
 |---|---|
 | `argocd` | Argo CD (GitOps controller) |
-| `kube-system` | Sealed Secrets operator |
+| `kube-system` | Sealed Secrets operator (legacy, sin CRs vivos) |
 | `cnpg-system` | CloudNativePG operator |
 | `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres, evolution-postgres, infisical-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
@@ -124,7 +125,7 @@ homelab-k8s/
 | Component | Helm repo | Chart | Version |
 |---|---|---|---|
 | Argo CD | manual install | install.yaml | stable |
-| Sealed Secrets | `https://bitnami-labs.github.io/sealed-secrets` | `sealed-secrets` | `2.*` |
+| Sealed Secrets | `https://bitnami-labs.github.io/sealed-secrets` | `sealed-secrets` | `2.*` _(legacy, sin CRs vivos)_ |
 | CloudNativePG | `https://cloudnative-pg.github.io/charts` | `cloudnative-pg` | `0.28.*` |
 | Prometheus+Grafana | `https://prometheus-community.github.io/helm-charts` | `kube-prometheus-stack` | `85.0.1` (Prometheus `v3.11.3`, Grafana `13.0.1`, operator `v0.90.1`) |
 | Loki | `https://grafana-community.github.io/helm-charts` | `loki` | `13.6.2` (Loki `3.7.1`) |
@@ -155,7 +156,7 @@ The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n,
 
 ### Architecture
 
-- `cloudflared` runs as a 2-replica `Deployment` in the `cloudflared` namespace, authenticating with a token sealed via Bitnami SealedSecrets (`infrastructure/cloudflared/sealed-secret.yaml`, key `token`).
+- `cloudflared` runs as a 2-replica `Deployment` in the `cloudflared` namespace, authenticating with a token managed via Infisical (`infrastructure/cloudflared/infisical-secret.yaml` → materializes Secret `cloudflared-token`, key `token`).
 - The connection is **outbound-only** from the cluster to Cloudflare edge over QUIC — no inbound ports open on the Mac mini.
 - All public hostnames in CF point to **the same backend**: `traefik.traefik.svc.cluster.local:80`. Cloudflare Tunnel forwards every public request to Traefik, and **Traefik routes by `Host` header** using regular `Ingress` resources (`*-public` Ingresses living next to each app's `values.yaml`).
 
@@ -206,7 +207,7 @@ Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.sv
 
 ### Pending
 
-- **Rotar el token de cloudflared**: el token original se compartió en chat durante el planning. Rotarlo desde `Networks → Tunnels → homelab-k8s → ⋯ → Refresh token`, repetir kubeseal (Fase 2 del runbook), commitear y pushear el nuevo `sealed-secret.yaml`.
+- **Rotar el token de cloudflared**: el token original se compartió en chat durante el planning. Rotarlo desde `Networks → Tunnels → homelab-k8s → ⋯ → Refresh token`, pegar el nuevo valor en Infisical (`/infrastructure/cloudflared`, key `token`). El operator re-sincroniza el `Secret` en ≤60s; basta con `kubectl rollout restart deploy/cloudflared -n cloudflared` para que tome el token nuevo. Sin commits.
 
 ## Chart-specific gotchas
 
@@ -249,8 +250,8 @@ Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.sv
 | **Evolution API v2.3.7** | Stream error code 515 after QR scan is **NORMAL** — WhatsApp asks the client to restart with saved creds. The reconnection is automatic. Don't try to "fix" the 515 itself; verify instead that messages flow afterwards (`evolution_instance_up = 1` and message count grows). |
 | **n8n webhooks from cluster** | When Evolution API (or any cluster workload) needs to call n8n webhooks, use internal DNS: `http://n8n.automation.svc.cluster.local/webhook/<UUID>` — NOT the public URL (`https://n8n.oscargicast.com/webhook/...`), which would hairpin through CF Tunnel needlessly. The `webhook-test/...` URLs are ephemeral and only respond while the n8n editor is open; production needs `/webhook/...` and the workflow must be active. |
 | **Evolution API calls from cluster** | Inverse of "n8n webhooks from cluster": when n8n (or any cluster workload) needs to call Evolution API, use internal DNS: `http://evolution-api.automation.svc.cluster.local:8085/...` — NOT the public URL (`https://evolution.oscargicast.com/...`), which is protected by a Self-hosted Cloudflare Access application and returns a sign-in HTML page (HTTP 200, `<title>Sign in ・ Cloudflare Access</title>`) instead of the API JSON response. The `apikey` header still applies. The Evolution API `PROXY_*` env vars are unrelated — they control Evolution → WhatsApp outbound, not how clients reach the pod. |
-| **speedtest-tracker (lscr.io/linuxserver) 1.x** | Requires `APP_KEY` (Laravel) as a `base64:<32-byte>` value, sealed via SealedSecret. The widget native `speedtest` v2 in Homepage requires `version: 2` + `key: <bearer>` where the bearer is a **Personal Access Token** generated FROM THE UI (Settings → API Keys) AFTER first login — it is NOT the same `APP_KEY` and NOT the same `PROMETHEUS_API_KEY`. The token must be injected into Homepage as `HOMEPAGE_VAR_SPEEDTEST_KEY` via a separate sealed secret (`homepage-widget-secrets`) consumed by `envFrom.secretRef` in the chart values — Homepage interpolates `{{HOMEPAGE_VAR_*}}` placeholders at render time. Prometheus scrape endpoint is `/api/v1/prometheus` (not `/metrics`) and requires a Bearer token in `Authorization`. UI is reachable only via Tailscale (`speedtest.oscargicast.com`, CNAME DNS-only). |
-| **Homepage secret injection** | The `jameswynn/homepage` chart v2.0.2 supports both `env:` (map → name/value pairs) and `envFrom:` (list → secretRef/configMapRef). To consume `HOMEPAGE_VAR_*` placeholders in `services.yaml` from a Sealed Secret, add the secret name under `envFrom.secretRef` at the top level of `values.yaml`. The Application must `include` the sealed-secret file in its `directory.include` filter — e.g. `include: "{ingress-public.yaml,sealed-secret-widget-secrets.yaml}"` — otherwise ArgoCD won't sync it. |
+| **speedtest-tracker (lscr.io/linuxserver) 1.x** | Requires `APP_KEY` (Laravel) as a `base64:<32-byte>` value, gestionado vía Infisical (`/homelab/speedtest-tracker`). The widget native `speedtest` v2 in Homepage requires `version: 2` + `key: <bearer>` where the bearer is a **Personal Access Token** generated FROM THE UI (Settings → API Keys) AFTER first login — it is NOT the same `APP_KEY` and NOT the same `PROMETHEUS_API_KEY`. The token must be injected into Homepage as `HOMEPAGE_VAR_SPEEDTEST_KEY` via el `Secret` materializado por el `InfisicalSecret` de Homepage (`homelab/homepage/infisical-secret.yaml`) consumido por `envFrom.secretRef` en los chart values — Homepage interpolates `{{HOMEPAGE_VAR_*}}` placeholders at render time. Prometheus scrape endpoint is `/api/v1/prometheus` (not `/metrics`) and requires a Bearer token in `Authorization`. UI is reachable only via Tailscale (`speedtest.oscargicast.com`, CNAME DNS-only). |
+| **Homepage secret injection** | The `jameswynn/homepage` chart v2.0.2 supports both `env:` (map → name/value pairs) and `envFrom:` (list → secretRef/configMapRef). To consume `HOMEPAGE_VAR_*` placeholders in `services.yaml` from el `Secret` materializado por Infisical, add the secret name under `envFrom.secretRef` at the top level of `values.yaml`. The Application must `include` the `InfisicalSecret` file in its `directory.include` filter — e.g. `include: "{ingress-public.yaml,infisical-secret.yaml}"` — otherwise ArgoCD won't sync it. |
 
 ## Cluster Management Commands
 

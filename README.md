@@ -12,7 +12,7 @@ graph TD
     COL --> K8S[K3s en Kubernetes]
 
     K8S --> NS_ARGOCD[argocd<br/><i>Argo CD GitOps</i>]
-    K8S --> NS_KS[kube-system<br/><i>Sealed Secrets operator (legacy)</i>]
+    K8S --> NS_KS[kube-system<br/><i>Sealed Secrets operator (legacy, sin CRs)</i>]
     K8S --> NS_INF_OP[infisical-operator<br/><i>Infisical Secrets Operator</i>]
     K8S --> NS_INF[infisical<br/><i>Infisical backend + Redis</i>]
     K8S --> NS_CNPG[cnpg-system<br/><i>CloudNativePG operator</i>]
@@ -117,12 +117,13 @@ homelab-k8s/
 │   └── observability.yaml
 ├── infrastructure/
 │   ├── namespaces/                     # Namespace CRs
-│   ├── sealed-secrets/                 # Sealed Secrets operator (legacy, en migración)
-│   ├── infisical/                      # Infisical backend (self-hosted) + Redis
+│   ├── sealed-secrets/                 # Sealed Secrets operator (legacy, sin CRs vivos)
+│   ├── infisical/                      # Infisical backend (self-hosted)
 │   ├── infisical-operator/             # Infisical Secrets Operator (materializa InfisicalSecret CRs)
+│   ├── redis/                          # Redis dedicado para Infisical
 │   ├── cloudnative-pg/                 # CNPG operator
 │   ├── traefik/                        # Traefik ingress controller
-│   ├── cloudflared/                    # CF Tunnel: deployment + sealed-secret + Application
+│   ├── cloudflared/                    # CF Tunnel: deployment + infisical-secret + Application
 │   └── argocd-config/                  # argocd-cmd-params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # cluster.yaml + infisical-secret.yaml
@@ -137,27 +138,16 @@ homelab-k8s/
 │   ├── n8n/                            # values.yaml + ingress-public.yaml
 │   └── evolution-api/                  # manifest-based + hostNetwork + ServiceMonitor
 ├── homelab/
-│   ├── homepage/                       # values.yaml + ingress-public.yaml + sealed-secret-widget-secrets.yaml
-│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + 2 SealedSecrets
+│   ├── homepage/                       # values.yaml + ingress-public.yaml + infisical-secret.yaml
+│   └── speedtest-tracker/              # manifest-based + ingress-internal + ServiceMonitor + infisical-secret.yaml
 └── docs/runbooks/                      # runbooks de operación
 ```
 
 ## Gestión de secrets
 
-> **En migración a Infisical (self-hosted).** Los secretos activos viven hoy en `InfisicalSecret` CRs que el Infisical Secrets Operator materializa como `Secret` nativos. Sealed Secrets sigue desplegado durante la transición pero ya no hay `SealedSecret` CRs en Git. Ver [`docs/runbooks/infisical-migration.md`](docs/runbooks/infisical-migration.md) para el flujo completo de creación/edición de secretos.
+Los secretos activos viven en **Infisical self-hosted** (`https://infisical.oscargicast.com`). El repo solo contiene `InfisicalSecret` CRs (punteros sin valores) que el Infisical Secrets Operator materializa como `Secret` nativos en ≤60s. Para crear/editar un secreto: editar el valor en la UI de Infisical + commitear el `InfisicalSecret` CR apuntando a su `secretsPath`. Ver [`docs/runbooks/infisical-migration.md`](docs/runbooks/infisical-migration.md) para el flujo completo y un ejemplo de CR.
 
-Flujo histórico (Sealed Secrets, todavía operativo si hace falta):
-
-```bash
-# Encriptar un secret antes de commitearlo (legacy)
-kubeseal --cert ~/.config/homelab-k8s-sealed-secrets-pub.pem \
-  --format yaml < secret.yaml > sealed-secret.yaml
-
-git add sealed-secret.yaml && git commit -m "feat: add sealed secret"
-rm secret.yaml  # borrar el plaintext
-```
-
-El archivo `secret.yaml` sigue en `.gitignore` — nunca va a Git.
+El operator de Bitnami Sealed Secrets sigue desplegado en `kube-system` por seguridad histórica, pero **no hay `SealedSecret` CRs en Git**. El flujo `kubeseal` queda disponible como fallback de emergencia (ver runbook). `**/secret.yaml` sigue en `.gitignore` — nunca va plaintext a Git.
 
 ## Bootstrap (primera vez)
 
@@ -167,17 +157,12 @@ kubectl create namespace argocd
 kubectl apply --server-side -n argocd -f \
   https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 2. Instalar kubeseal y obtener el cert
-brew install kubeseal
-kubeseal --fetch-cert \
-  --controller-namespace kube-system \
-  --controller-name sealed-secrets-controller \
-  > ~/.config/homelab-k8s-sealed-secrets-pub.pem
+# 2. Bootstrap de Infisical: crear el Secret `infisical-bootstrap` (admin email/password
+#    iniciales) y `infisical-redis-auth` en el namespace `infisical` antes del primer sync,
+#    y luego configurar la Machine Identity (k8sAuth) en `infisical-operator`.
+#    Detalles paso a paso en docs/runbooks/infisical-migration.md (Fase 0-2).
 
-# 3. Sellar los secrets de las bases de datos
-# Ver CLAUDE.md para el flujo completo
-
-# 4. Aplicar el root Application (único apply manual)
+# 3. Aplicar el root Application (único apply manual)
 kubectl apply -f bootstrap/argocd/root-app.yaml
 ```
 
