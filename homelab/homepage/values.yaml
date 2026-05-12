@@ -246,8 +246,14 @@ config:
                   query: sum(rate(container_cpu_usage_seconds_total{namespace="infisical",pod=~"infisical-.*"}[5m]))
                   format:
                     type: percent
-                - label: Redis
-                  query: sum(kube_pod_status_phase{namespace="infisical",pod=~"infisical-redis-.*",phase="Running"})
+        - Redis:
+            href: "https://infisical.oscargicast.com/"
+            description: Cache dedicado para Infisical
+            icon: redis.png
+            widget:
+              type: redis
+              url: redis://infisical-redis.infisical.svc.cluster.local:6379
+              password: "{{HOMEPAGE_VAR_REDIS_PASSWORD}}"
     - Red:
         - Speedtest:
             href: "https://speedtest.oscargicast.com/"
@@ -294,7 +300,7 @@ config:
               type: iframe
               name: GitHub Contributions
               src: https://ghchart.rshah.org/oscargicast
-              classes: h-64 w-full
+              classes: h-32 w-full
               referrerPolicy: no-referrer
               allowScrolling: "no"
               loadingStrategy: eager
