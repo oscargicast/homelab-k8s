@@ -33,6 +33,9 @@ config:
       brightness: 50
       opacity: 60
     layout:
+      Monitoring:
+        style: row
+        columns: 1
       Cluster:
         style: row
         columns: 2
@@ -51,6 +54,19 @@ config:
   kubernetes:
     mode: cluster
   services:
+    - Monitoring:
+        - Histórico:
+            description: CPU / Memory / Disk / Network — últimas 24h
+            href: "https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring"
+            icon: grafana.png
+            widget:
+              type: iframe
+              name: Homelab Monitoring
+              src: https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring?orgId=1&theme=dark&kiosk=tv&refresh=30s
+              classes: h-[480px] w-full
+              referrerPolicy: no-referrer
+              allowScrolling: "no"
+              loadingStrategy: lazy
     - Cluster:
         - Overview:
             description: Estado general del cluster
@@ -240,13 +256,17 @@ config:
         uptime: true
         disk: /
         label: System
-    - iframe:
-        name: Monitoring
-        src: https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring?orgId=1&theme=dark&kiosk=tv&refresh=30s
-        classes: h-[480px] w-full
-        referrerPolicy: no-referrer
-        allowScrolling: "no"
-        loadingStrategy: lazy
+    - glances:
+        # IP Tailscale del Mac mini host (CoreDNS del cluster no resuelve MagicDNS).
+        url: http://100.97.206.96:61208
+        version: 4
+        cpu: true
+        mem: true
+        uptime: true
+        disk: /
+        label: "Mac mini"
+        chart: false
+        expanded: true
     - datetime:
         text_size: xl
         format:
