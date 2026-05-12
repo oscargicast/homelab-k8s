@@ -35,6 +35,9 @@ spec:
 
         ports:
           web: {}
+          metrics:
+            expose:
+              default: true
 
         metrics:
           prometheus:
