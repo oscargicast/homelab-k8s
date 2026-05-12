@@ -85,19 +85,19 @@ config:
               url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
               metrics:
                 - label: Memoria
-                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"n8n-.*",container="n8n"})
+                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"n8n-.*"})
                   format:
                     type: bytes
                 - label: CPU
-                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"n8n-.*",container="n8n"}[5m]))
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"n8n-.*"}[5m]))
                   format:
                     type: percent
                 - label: Heap n8n
-                  query: sum(nodejs_heap_size_used_bytes{job="n8n"})
+                  query: sum(n8n_nodejs_heap_size_used_bytes{job="n8n"})
                   format:
                     type: bytes
                 - label: Eventloop lag
-                  query: max(nodejs_eventloop_lag_seconds{job="n8n"})
+                  query: max(n8n_nodejs_eventloop_lag_seconds{job="n8n"})
                   format:
                     type: duration
         - Evolution API:
@@ -115,11 +115,11 @@ config:
                   format:
                     type: number
                 - label: Memoria
-                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"evolution-api-.*",container="evolution-api"})
+                  query: sum(container_memory_working_set_bytes{namespace="automation",pod=~"evolution-api-.*"})
                   format:
                     type: bytes
                 - label: CPU
-                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"evolution-api-.*",container="evolution-api"}[5m]))
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="automation",pod=~"evolution-api-.*"}[5m]))
                   format:
                     type: percent
     - Observabilidad:
@@ -132,11 +132,11 @@ config:
               url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
               metrics:
                 - label: Estado
-                  query: max(up{job="prometheus-kube-prometheus-grafana"})
+                  query: max(up{job="prometheus-grafana"})
                   format:
                     type: number
                 - label: Memoria
-                  query: sum(container_memory_working_set_bytes{namespace="observability",pod=~"prometheus-kube-prometheus-grafana-.*",container="grafana"})
+                  query: sum(container_memory_working_set_bytes{namespace="observability",pod=~"prometheus-grafana-.*"})
                   format:
                     type: bytes
                 - label: Dashboards
@@ -241,7 +241,4 @@ config:
           showLabel: true
           label: "homelab"
         nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
+          show: false
