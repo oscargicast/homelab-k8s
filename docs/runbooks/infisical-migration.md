@@ -388,6 +388,14 @@ git push
 
 Argo CD elimina el `SealedSecret` CR (Bitnami). El `Secret` nativo persiste porque ya no tiene controlling owner — y el `InfisicalSecret` operator sigue actualizando su `.data` cada 60s.
 
+> **Caveat — apps con `syncPolicy.automated.prune: false`** (los 3 CNPG `n8n-postgres`, `postgres-lab`, `evolution-postgres`): ArgoCD detecta el SealedSecret como OutOfSync pero **no lo elimina** del cluster (el `prune: false` es un safety net para no borrar `Cluster` CRs por error). Tras el push, hay que borrar los SealedSecrets manualmente:
+>
+> ```bash
+> ssh macmini 'zsh -lc "kubectl -n databases delete sealedsecret n8n-db-user postgres-lab-app-user evolution-db-user"'
+> ```
+>
+> Es seguro porque ya orphan-eamos los Secrets en el paso previo.
+
 **Restart opcional** si el workload cachea credenciales al startup:
 
 ```bash
