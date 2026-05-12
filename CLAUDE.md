@@ -28,6 +28,8 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 
 ## Secrets — Sealed Secrets
 
+> **En migración a Infisical (self-hosted).** El stack de Bitnami Sealed Secrets sigue operativo durante la transición gradual de los 6 secretos vivos. Ver `docs/runbooks/infisical-migration.md` para el plan completo y el orden de migración. Una vez completada, esta sección será reescrita y la tabla de namespaces/stack actualizada para reflejar Infisical como fuente de verdad.
+
 **Never commit plaintext secrets.** `.gitignore` blocks `**/secret.yaml`.
 
 Workflow to add/update a secret:
@@ -112,6 +114,8 @@ homelab-k8s/
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
+| `infisical` | Infisical backend (self-hosted) + dedicated Redis (in migration) |
+| `infisical-operator` | Infisical Secrets Operator (materializes Secrets from InfisicalSecret CRs) |
 | `automation` | n8n + evolution-api |
 | `homelab` | Homepage dashboard + speedtest-tracker |
 
@@ -130,6 +134,9 @@ homelab-k8s/
 | Evolution API | _(no Helm chart, manifest-based)_ | `evoapicloud/evolution-api` image | `v2.3.7` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
 | Speedtest Tracker | _(no Helm chart, manifest-based)_ | `lscr.io/linuxserver/speedtest-tracker` | `1.14.1` |
+| Infisical (backend+UI) | `https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/` | `infisical-standalone` | `1.8.0` (image `v0.159.28`) |
+| Infisical Secrets Operator | `https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/` | `secrets-operator` | `0.10.33` |
+| Redis (for Infisical) | _(no Helm chart, manifest-based)_ | `redis` (official) | `8.6.3-alpine` |
 
 ## Architecture Constraints
 

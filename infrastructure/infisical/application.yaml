@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infisical
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+      chart: infisical-standalone
+      targetRevision: 1.8.0
+      helm:
+        values: |
+          infisical:
+            replicaCount: 1
+            image:
+              tag: "v0.159.28"
+            kubeSecretRef: "infisical-bootstrap"
+            extraEnv:
+              - name: REDIS_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: infisical-redis-auth
+                    key: REDIS_URL
+            resources:
+              requests:
+                cpu: 50m
+                memory: 200Mi
+              limits:
+                memory: 512Mi
+          ingress:
+            enabled: false
+            nginx:
+              enabled: false
+          postgresql:
+            enabled: false
+          redis:
+            enabled: false
+    - repoURL: https://github.com/oscargicast/homelab-k8s.git
+      targetRevision: HEAD
+      path: infrastructure/infisical
+      directory:
+        include: "{ingress-public.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infisical
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
