@@ -1,5 +1,5 @@
 image:
-  tag: "2.19.5"
+  tag: "2.20.6"
 
 main:
   config:
