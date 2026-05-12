@@ -51,10 +51,10 @@ config:
         columns: 3
       Infisical:
         style: row
-        columns: 1
+        columns: 2
       Red:
         style: row
-        columns: 1
+        columns: 2
       Personal:
         style: row
         columns: 1
@@ -269,6 +269,9 @@ config:
               url: https://api.github.com/users/oscargicast
               refreshInterval: 600000
               method: GET
+              headers:
+                User-Agent: homepage-oscargicast
+                Accept: application/vnd.github+json
               mappings:
                 - field: followers
                   label: Followers
@@ -290,8 +293,8 @@ config:
             widget:
               type: iframe
               name: GitHub Contributions
-              src: https://ghchart.rshah.org/38bdf8/oscargicast
-              classes: h-44 w-full
+              src: https://ghchart.rshah.org/oscargicast
+              classes: h-64 w-full
               referrerPolicy: no-referrer
               allowScrolling: "no"
               loadingStrategy: eager
