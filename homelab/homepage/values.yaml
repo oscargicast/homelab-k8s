@@ -37,9 +37,6 @@ config:
       brightness: 50
       opacity: 60
     layout:
-      Red:
-        style: row
-        columns: 1
       Cluster:
         style: row
         columns: 2
@@ -52,23 +49,18 @@ config:
       Databases:
         style: row
         columns: 3
+      Infisical:
+        style: row
+        columns: 1
+      Red:
+        style: row
+        columns: 1
       Personal:
         style: row
         columns: 1
   kubernetes:
     mode: cluster
   services:
-    - Red:
-        - Speedtest:
-            href: "https://speedtest.oscargicast.com/"
-            description: ISP throughput (download / upload / ping)
-            icon: speedtest-tracker.png
-            widget:
-              type: speedtest
-              url: http://speedtest-tracker.homelab.svc.cluster.local
-              version: 2
-              key: "{{HOMEPAGE_VAR_SPEEDTEST_KEY}}"
-              bitratePrecision: 3
     - Cluster:
         - Overview:
             description: Estado general del cluster
@@ -235,6 +227,38 @@ config:
                   format:
                     type: number
                     suffix: /s
+    - Infisical:
+        - Infisical:
+            href: "https://infisical.oscargicast.com/"
+            description: Self-hosted secrets manager
+            icon: infisical.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Backend
+                  query: sum(kube_pod_status_phase{namespace="infisical",pod=~"infisical-.*",phase="Running"})
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="infisical",pod=~"infisical-.*"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="infisical",pod=~"infisical-.*"}[5m]))
+                  format:
+                    type: percent
+                - label: Redis
+                  query: sum(kube_pod_status_phase{namespace="infisical",pod=~"infisical-redis-.*",phase="Running"})
+    - Red:
+        - Speedtest:
+            href: "https://speedtest.oscargicast.com/"
+            description: ISP throughput (download / upload / ping)
+            icon: speedtest-tracker.png
+            widget:
+              type: speedtest
+              url: http://speedtest-tracker.homelab.svc.cluster.local
+              version: 2
+              key: "{{HOMEPAGE_VAR_SPEEDTEST_KEY}}"
+              bitratePrecision: 3
     - Personal:
         - GitHub:
             href: "https://github.com/oscargicast"
