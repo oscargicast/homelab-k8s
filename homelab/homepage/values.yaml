@@ -1,5 +1,9 @@
 replicaCount: 1
 
+image:
+  repository: ghcr.io/gethomepage/homepage
+  tag: "v1.13.1"
+
 enableRbac: true
 
 env:
@@ -17,6 +21,7 @@ resources:
     cpu: 100m
 
 config:
+  bookmarks: []
   settings:
     title: "Homelab"
     theme: dark
@@ -40,6 +45,9 @@ config:
       Databases:
         style: row
         columns: 3
+      Personal:
+        style: row
+        columns: 2
   kubernetes:
     mode: cluster
   services:
@@ -217,6 +225,31 @@ config:
                   format:
                     type: number
                     suffix: /s
+    - Personal:
+        - GitHub:
+            href: "https://github.com/oscargicast"
+            description: Contribution heatmap
+            icon: github.png
+            widget:
+              type: iframe
+              name: GitHub Contributions
+              src: https://ghchart.rshah.org/oscargicast
+              classes: h-32 w-full
+              referrerPolicy: no-referrer
+              allowScrolling: "no"
+              loadingStrategy: eager
+        - Stats:
+            href: "https://github.com/oscargicast"
+            description: Commits, streak, lenguajes
+            icon: github.png
+            widget:
+              type: iframe
+              name: GitHub Stats
+              src: https://github-readme-stats.vercel.app/api?username=oscargicast&show_icons=true&theme=transparent&hide_border=true
+              classes: h-40 w-full
+              referrerPolicy: no-referrer
+              allowScrolling: "no"
+              loadingStrategy: eager
   widgets:
     - resources:
         backend: kubernetes
@@ -233,6 +266,24 @@ config:
           dateStyle: long
           timeStyle: short
           hour12: false
+    - openmeteo:
+        label: Lima
+        latitude: -12.0464
+        longitude: -77.0428
+        timezone: America/Lima
+        units: metric
+        cache: 5
+    - glances:
+        url: http://oscar-mini-m1.tail90f0a7.ts.net:61208
+        version: 4
+        cpu: true
+        mem: true
+        cputemp: true
+        uptime: true
+        disk: /
+        label: "Mac mini"
+        chart: false
+        expanded: true
     - kubernetes:
         cluster:
           show: true
