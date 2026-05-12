@@ -140,6 +140,28 @@ En el dashboard de **Cloudflare**:
    - Application domain: `infisical.oscargicast.com`
    - Policy: `Allow` → emails `oscar.gi.cast@gmail.com`.
 
+### A3.5. Bootstrap del SA token del operator (K8s 1.24+)
+
+El operator v0.10.33 autentica con Infisical via Kubernetes Auth y busca el JWT del cluster en `serviceAccount.secrets[]` del SA `infisical-operator-controller-manager`. En K8s 1.24+, el campo `.secrets[]` ya **no** se auto-llena cuando se crea el SA — hay que crear el Secret legacy y vincularlo a mano.
+
+El **Secret** está en Git (`infrastructure/infisical-operator/sa-token.yaml`, lo aplica ArgoCD), pero el **patch al SA** se hace una sola vez post-deploy:
+
+```bash
+# Esperar a que ArgoCD haya creado el Secret + el SA
+kubectl -n infisical-operator get secret infisical-operator-controller-manager-token
+kubectl -n infisical-operator get sa infisical-operator-controller-manager
+
+# Vincular el Secret al SA (selfHeal de ArgoCD ignora este campo via ignoreDifferences)
+kubectl -n infisical-operator patch sa infisical-operator-controller-manager \
+  --type=json \
+  -p='[{"op":"add","path":"/secrets","value":[{"name":"infisical-operator-controller-manager-token"}]}]'
+
+# Restart del operator para que re-lea el SA
+kubectl -n infisical-operator rollout restart deploy -l app.kubernetes.io/name=secrets-operator
+```
+
+Verificación — logs del operator deben mostrar `Fetched secrets via machine identity` (no más errores `no secrets found for service account`).
+
 ### A4. Verificación
 
 ```bash
@@ -398,6 +420,8 @@ Si un secret migrado rompe su workload:
 | `InfisicalSecret` en estado `Failed` con error `403 Forbidden` | Machine Identity no autoriza al SA del operator | UI Infisical → Identity `k8s-operator` → Authentication → Kubernetes Auth → verificar Allowed SA = `infisical-operator-controller-manager`, namespace `infisical-operator` |
 | `InfisicalSecret` `Failed` con `project not found` | `projectSlug` o `envSlug` mal | UI → Project Settings → copiar el slug exacto |
 | Sync de ArgoCD falla con `spec.authentication.kubernetesAuth.secretsScope: Required value` | YAML usa estructura pre-v0.10 (top-level `projectSlug`/`envSlug`/`secretsPath`) | Mover esos 3 campos adentro de `spec.authentication.kubernetesAuth.secretsScope` (ver plantilla en C3) |
+| Logs del operator: `unable to get service account token [err=no secrets found for service account infisical-operator-controller-manager]` | K8s 1.24+ no auto-llena `.secrets[]` del SA, y el operator espera el patrón legacy | Aplicar el patch del SA descrito en Fase A3.5. El Secret legacy ya está en Git (`infrastructure/infisical-operator/sa-token.yaml`); falta solo el `kubectl patch sa` + `rollout restart` del operator |
+| Logs del operator: `Project with slug 'XXX' not found` (404) | El project slug auto-generado por Infisical incluye un sufijo random (ej. `homelab-k8s-2k-sb`) y no coincide con el slug del CR | UI Infisical → Project Settings → Project Overview → editar **Project slug** a `homelab-k8s` → Save. El próximo resync (60s) materializa todos los Secrets |
 | `https://infisical.oscargicast.com` retorna 404 page not found (Go default body) | Catch-all del cloudflared, no llegó a Traefik | `kubectl -n cloudflared logs deploy/cloudflared \| grep -i infisical` — confirmar que cloudflared cargó el hostname. Si no, revisar Public Hostnames en CF dashboard |
 | `https://infisical.oscargicast.com` retorna 404 de Traefik | Ingress no encontró el Service | `kubectl -n infisical describe ingress infisical-public` — verificar `Backends` no vacío |
 | Logs del operator: `failed to login: getting service account token` | El SA `infisical-operator-controller-manager` no tiene permiso para TokenRequest | Verificar que el chart creó RBAC correctamente: `kubectl -n infisical-operator describe sa infisical-operator-controller-manager` |
