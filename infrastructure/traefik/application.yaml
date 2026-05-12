@@ -35,6 +35,24 @@ spec:
 
         ports:
           web: {}
+          metrics:
+            port: 9101
+            exposedPort: 9101
+            expose:
+              default: true
+
+        metrics:
+          prometheus:
+            entryPoint: metrics
+            addEntryPointsLabels: true
+            addRoutersLabels: true
+            addServicesLabels: true
+            serviceMonitor:
+              enabled: true
+              namespace: observability
+              interval: 30s
+              namespaceSelector:
+                any: true
 
   destination:
     server: https://kubernetes.default.svc
