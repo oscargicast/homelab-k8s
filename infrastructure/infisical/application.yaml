@@ -16,6 +16,7 @@ spec:
       helm:
         values: |
           infisical:
+            fullnameOverride: "infisical"
             replicaCount: 1
             image:
               tag: "v0.159.28"
