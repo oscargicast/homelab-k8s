@@ -352,6 +352,33 @@ kubectl -n infisical-operator logs -l app.kubernetes.io/name=secrets-operator --
 
 #### C6. Borrar el SealedSecret de Bitnami
 
+> **⚠️ Prerrequisito crítico — orphan-ear el Secret nativo primero.**
+>
+> El operator de Infisical con `creationPolicy: Owner` solo actualiza `.data` del Secret existente; **no** toma ownership (no agrega `ownerReference` apuntando al `InfisicalSecret` CR). El Secret materializado original todavía tiene un `ownerReference` con `controller: true` apuntando al `SealedSecret` Bitnami. Si borrás el `SealedSecret` CR sin orphan-ear primero, K8s hace garbage-collect en cascada y **borra el `Secret` nativo** — el workload se queda sin credenciales.
+>
+> Antes del `git rm`, hay que quitar el `ownerReference` del SealedSecret. Vía heredoc para evitar quoting hell:
+>
+> ```bash
+> ssh macmini << 'EOF'
+> zsh -lc 'cat > /tmp/orphan-patch.json <<JSON
+> {"metadata":{"ownerReferences":null}}
+> JSON
+> kubectl -n <ns> patch secret <secret-name> --type=merge --patch-file=/tmp/orphan-patch.json
+> rm /tmp/orphan-patch.json'
+> EOF
+> ```
+>
+> Confirmá que el Secret quedó sin `ownerReferences`:
+>
+> ```bash
+> ssh macmini 'zsh -lc "kubectl -n <ns> get secret <secret-name> -o yaml | grep -A 5 ownerReferences"'
+> # No debe imprimir nada (campo eliminado)
+> ```
+>
+> **Ojo con la race condition**: el sealed-secrets controller reconcilia ~cada 30 min y puede re-agregar el `ownerReference`. Recomendación: hacer el patch y commitear+pushear el `git rm` en la misma sesión para que ArgoCD remueva el `SealedSecret` CR antes de la siguiente reconciliación del controller.
+
+Una vez orphan-eado el Secret:
+
 ```bash
 git rm <app>/sealed-secret.yaml
 # Quitar la referencia a sealed-secret.yaml del directory.include del application.yaml
@@ -359,7 +386,7 @@ git commit -m "chore(infisical): drop bitnami sealed-secret for <SECRET-NAME>"
 git push
 ```
 
-Argo CD elimina el `SealedSecret` CR (Bitnami). El `Secret` nativo persiste porque ya es propiedad del `InfisicalSecret` CR (no del SealedSecret).
+Argo CD elimina el `SealedSecret` CR (Bitnami). El `Secret` nativo persiste porque ya no tiene controlling owner — y el `InfisicalSecret` operator sigue actualizando su `.data` cada 60s.
 
 **Restart opcional** si el workload cachea credenciales al startup:
 
