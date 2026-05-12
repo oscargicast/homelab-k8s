@@ -287,16 +287,21 @@ spec:
       serviceAccountRef:
         name: infisical-operator-controller-manager
         namespace: infisical-operator
-  projectSlug: homelab-k8s
-  envSlug: prod
-  secretsPath: <FOLDER-PATH>
+      secretsScope:
+        projectSlug: homelab-k8s
+        envSlug: prod
+        secretsPath: <FOLDER-PATH>
   managedSecretReference:
     secretName: <SECRET-NAME>
     secretNamespace: <NAMESPACE>
     creationPolicy: Owner
+    # Para credenciales de CNPG (n8n-db-user, postgres-lab-app-user, evolution-db-user):
+    # secretType: kubernetes.io/basic-auth
 ```
 
 > `hostAPI` se omite — el operator usa el default del Helm values (`http://infisical.infisical.svc.cluster.local:8080/api`).
+>
+> **⚠️ Estructura del CRD (v0.10.x)**: `projectSlug`, `envSlug` y `secretsPath` viven **dentro** de `spec.authentication.kubernetesAuth.secretsScope`, no en el top-level del `spec`. Versiones más viejas del operator los aceptaban a top-level — si copiás ejemplos viejos de docs/blogs, vas a ver el error `spec.authentication.kubernetesAuth.secretsScope: Required value` en ArgoCD sync.
 
 Agregar también el archivo al `directory.include` del `application.yaml` del app correspondiente (mirar el commit "feat(infisical): migrate <secret>" para el patrón exacto).
 
@@ -392,6 +397,7 @@ Si un secret migrado rompe su workload:
 | `infisical` pod up pero `/api/status` retorna 500 | Redis no reachable | `kubectl -n infisical get pods -l app.kubernetes.io/name=infisical-redis` — debe estar Running. Probar: `kubectl -n infisical exec deploy/infisical-redis -- redis-cli -a "$(kubectl -n infisical get secret infisical-redis-auth -o jsonpath='{.data.REDIS_PASSWORD}' \| base64 -d)" ping` |
 | `InfisicalSecret` en estado `Failed` con error `403 Forbidden` | Machine Identity no autoriza al SA del operator | UI Infisical → Identity `k8s-operator` → Authentication → Kubernetes Auth → verificar Allowed SA = `infisical-operator-controller-manager`, namespace `infisical-operator` |
 | `InfisicalSecret` `Failed` con `project not found` | `projectSlug` o `envSlug` mal | UI → Project Settings → copiar el slug exacto |
+| Sync de ArgoCD falla con `spec.authentication.kubernetesAuth.secretsScope: Required value` | YAML usa estructura pre-v0.10 (top-level `projectSlug`/`envSlug`/`secretsPath`) | Mover esos 3 campos adentro de `spec.authentication.kubernetesAuth.secretsScope` (ver plantilla en C3) |
 | `https://infisical.oscargicast.com` retorna 404 page not found (Go default body) | Catch-all del cloudflared, no llegó a Traefik | `kubectl -n cloudflared logs deploy/cloudflared \| grep -i infisical` — confirmar que cloudflared cargó el hostname. Si no, revisar Public Hostnames en CF dashboard |
 | `https://infisical.oscargicast.com` retorna 404 de Traefik | Ingress no encontró el Service | `kubectl -n infisical describe ingress infisical-public` — verificar `Backends` no vacío |
 | Logs del operator: `failed to login: getting service account token` | El SA `infisical-operator-controller-manager` no tiene permiso para TokenRequest | Verificar que el chart creó RBAC correctamente: `kubectl -n infisical-operator describe sa infisical-operator-controller-manager` |
