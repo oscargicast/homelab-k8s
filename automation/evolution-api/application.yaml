@@ -12,7 +12,7 @@ spec:
     targetRevision: HEAD
     path: automation/evolution-api
     directory:
-      include: "{deployment.yaml,service.yaml,sealed-secret.yaml,ingress-public.yaml,service-monitor.yaml}"
+      include: "{deployment.yaml,service.yaml,sealed-secret.yaml,infisical-secret.yaml,ingress-public.yaml,service-monitor.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: automation

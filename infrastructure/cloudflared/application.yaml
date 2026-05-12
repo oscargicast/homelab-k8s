@@ -14,7 +14,7 @@ spec:
     targetRevision: HEAD
     path: infrastructure/cloudflared
     directory:
-      include: "{deployment.yaml,sealed-secret.yaml}"
+      include: "{deployment.yaml,sealed-secret.yaml,infisical-secret.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: cloudflared

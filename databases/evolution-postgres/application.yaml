@@ -12,7 +12,7 @@ spec:
     targetRevision: HEAD
     path: databases/evolution-postgres
     directory:
-      include: "{cluster.yaml,sealed-secret.yaml}"
+      include: "{cluster.yaml,sealed-secret.yaml,infisical-secret.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: databases
