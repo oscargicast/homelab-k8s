@@ -99,6 +99,55 @@ kubectl run -n databases psql-test --rm -it --restart=Never \
   -c '\l'
 ```
 
+## Acceso a la SQLite de speedtest-tracker
+
+`speedtest-tracker` (namespace `homelab`) usa **SQLite** embebido en el PVC `speedtest-tracker-data`, no CNPG. No tiene Service de DB, ni credenciales en SealedSecret — el archivo vive en `/config/database/database.sqlite` dentro del pod.
+
+### Inspección rápida (read-only, sin tocar el archivo)
+
+```bash
+ssh macmini
+
+# Una sentencia ad-hoc (ej. último resultado)
+kubectl -n homelab exec deploy/speedtest-tracker -- \
+  sqlite3 /config/database/database.sqlite \
+  "SELECT id, datetime(created_at,'localtime') AS at, download/1e6 AS dl_mbps, upload/1e6 AS ul_mbps, ping FROM results ORDER BY id DESC LIMIT 5;"
+
+# Shell interactivo
+kubectl -n homelab exec -it deploy/speedtest-tracker -- \
+  sqlite3 /config/database/database.sqlite
+# .tables
+# .schema results
+# .quit
+```
+
+### Backup ad-hoc
+
+```bash
+# Snapshot consistente al filesystem local de la mac mini
+kubectl -n homelab exec deploy/speedtest-tracker -- \
+  sqlite3 /config/database/database.sqlite ".backup /tmp/speedtest.sqlite.bak"
+kubectl -n homelab cp \
+  homelab/$(kubectl -n homelab get pod -l app.kubernetes.io/name=speedtest-tracker -o jsonpath='{.items[0].metadata.name}'):/tmp/speedtest.sqlite.bak \
+  ~/backups/speedtest-$(date +%Y%m%d).sqlite
+```
+
+### Credenciales de la UI
+
+Las credenciales de admin de la UI **no viven en un SealedSecret** — se crean al primer login (default `admin@example.com` / `password`, hay que cambiar inmediatamente) y se almacenan hasheadas dentro del SQLite. Ver `docs/runbooks/speedtest-tracker-setup.md` Fase 4.
+
+Si perdés el password de admin: `kubectl -n homelab exec -it deploy/speedtest-tracker -- php artisan tinker` y dentro:
+
+```php
+$u = \App\Models\User::first(); $u->password = bcrypt('nuevo-password'); $u->save();
+```
+
+### ¿Por qué SQLite en vez de CNPG?
+
+Carga real ~24 rows/día (1 test/hora) × ~200 bytes/row = ~5 KB/día. Un Postgres dedicado sería overkill en un cluster con presupuesto de 10 GB RAM. Si en algún momento se necesita historial cross-service o queries complejas, migrar a CNPG está soportado por la imagen vía `DB_CONNECTION=pgsql` + `DB_HOST/PORT/DATABASE/USERNAME/PASSWORD`.
+
+---
+
 ## ¿Por qué no exponerlo por Traefik / Cloudflare Tunnel?
 
 - Traefik corre solo con entrypoint `web` (HTTP). Habilitar TCP requiere agregar entrypoint, abrir puerto en el host, sumar `IngressRouteTCP` y mantener esa pieza — más superficie, beneficio bajo en un homelab.

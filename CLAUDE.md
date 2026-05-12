@@ -111,7 +111,7 @@ homelab-k8s/
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
 | `automation` | n8n + evolution-api |
-| `homelab` | Homepage dashboard |
+| `homelab` | Homepage dashboard + speedtest-tracker |
 
 ## Stack & Helm Charts
 
@@ -127,6 +127,7 @@ homelab-k8s/
 | n8n | `oci://8gears.container-registry.com/library/n8n` | `n8n` | `2.0.1` |
 | Evolution API | _(no Helm chart, manifest-based)_ | `evoapicloud/evolution-api` image | `v2.3.7` |
 | Homepage | `https://jameswynn.github.io/helm-charts` | `homepage` | `2.*` |
+| Speedtest Tracker | _(no Helm chart, manifest-based)_ | `lscr.io/linuxserver/speedtest-tracker` | `1.14.1` |
 
 ## Architecture Constraints
 
@@ -141,7 +142,7 @@ homelab-k8s/
 
 ## Cloudflare Tunnel routing
 
-The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Evolution API, Grafana, Homepage, Argo CD) and **internal via Tailscale + Traefik** (Prometheus).
+The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n, Evolution API, Grafana, Homepage, Argo CD) and **internal via Tailscale + Traefik** (Prometheus, Speedtest Tracker).
 
 ### Architecture
 
@@ -160,6 +161,7 @@ The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n,
 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale IP is private) |
 | `grafana-internal.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale-only Grafana endpoint used by Homepage iframe) |
+| `speedtest.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale-only speedtest-tracker UI/API) |
 
 ### Config-as-code trade-off
 
@@ -235,6 +237,8 @@ Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.sv
 | **Evolution API v2.3.7** | Stream error code 515 after QR scan is **NORMAL** — WhatsApp asks the client to restart with saved creds. The reconnection is automatic. Don't try to "fix" the 515 itself; verify instead that messages flow afterwards (`evolution_instance_up = 1` and message count grows). |
 | **n8n webhooks from cluster** | When Evolution API (or any cluster workload) needs to call n8n webhooks, use internal DNS: `http://n8n.automation.svc.cluster.local/webhook/<UUID>` — NOT the public URL (`https://n8n.oscargicast.com/webhook/...`), which would hairpin through CF Tunnel needlessly. The `webhook-test/...` URLs are ephemeral and only respond while the n8n editor is open; production needs `/webhook/...` and the workflow must be active. |
 | **Evolution API calls from cluster** | Inverse of "n8n webhooks from cluster": when n8n (or any cluster workload) needs to call Evolution API, use internal DNS: `http://evolution-api.automation.svc.cluster.local:8085/...` — NOT the public URL (`https://evolution.oscargicast.com/...`), which is protected by a Self-hosted Cloudflare Access application and returns a sign-in HTML page (HTTP 200, `<title>Sign in ・ Cloudflare Access</title>`) instead of the API JSON response. The `apikey` header still applies. The Evolution API `PROXY_*` env vars are unrelated — they control Evolution → WhatsApp outbound, not how clients reach the pod. |
+| **speedtest-tracker (lscr.io/linuxserver) 1.x** | Requires `APP_KEY` (Laravel) as a `base64:<32-byte>` value, sealed via SealedSecret. The widget native `speedtest` v2 in Homepage requires `version: 2` + `key: <bearer>` where the bearer is a **Personal Access Token** generated FROM THE UI (Settings → API Keys) AFTER first login — it is NOT the same `APP_KEY` and NOT the same `PROMETHEUS_API_KEY`. The token must be injected into Homepage as `HOMEPAGE_VAR_SPEEDTEST_KEY` via a separate sealed secret (`homepage-widget-secrets`) consumed by `envFrom.secretRef` in the chart values — Homepage interpolates `{{HOMEPAGE_VAR_*}}` placeholders at render time. Prometheus scrape endpoint is `/api/v1/prometheus` (not `/metrics`) and requires a Bearer token in `Authorization`. UI is reachable only via Tailscale (`speedtest.oscargicast.com`, CNAME DNS-only). |
+| **Homepage secret injection** | The `jameswynn/homepage` chart v2.0.2 supports both `env:` (map → name/value pairs) and `envFrom:` (list → secretRef/configMapRef). To consume `HOMEPAGE_VAR_*` placeholders in `services.yaml` from a Sealed Secret, add the secret name under `envFrom.secretRef` at the top level of `values.yaml`. The Application must `include` the sealed-secret file in its `directory.include` filter — e.g. `include: "{ingress-public.yaml,sealed-secret-widget-secrets.yaml}"` — otherwise ArgoCD won't sync it. |
 
 ## Cluster Management Commands
 
