@@ -18,10 +18,10 @@ serviceAccount:
 
 resources:
   requests:
-    memory: 64Mi
+    memory: 128Mi
     cpu: 10m
   limits:
-    memory: 128Mi
+    memory: 256Mi
     cpu: 100m
 
 config:
@@ -328,17 +328,6 @@ config:
         uptime: true
         disk: /
         label: System
-    - glances:
-        # IP Tailscale del Mac mini host (CoreDNS del cluster no resuelve MagicDNS).
-        url: http://100.97.206.96:61208
-        version: 4
-        cpu: true
-        mem: true
-        uptime: true
-        disk: /
-        label: "Mac mini"
-        chart: false
-        expanded: true
     - datetime:
         text_size: xl
         format:
