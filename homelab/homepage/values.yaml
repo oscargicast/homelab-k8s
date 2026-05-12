@@ -72,11 +72,11 @@ config:
                     type: number
                     suffix: /s
                 - label: Node CPU %
-                  query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+                  query: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
                   format:
                     type: percent
                 - label: Node mem used
-                  query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+                  query: sum(node_memory_MemTotal_bytes) - sum(node_memory_MemAvailable_bytes)
                   format:
                     type: bytes
         - Argo CD:
