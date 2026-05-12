@@ -179,6 +179,8 @@ Tras login admin en `https://infisical.oscargicast.com`:
   | (mismo `databases`) | crear `postgres-lab` | `/databases/postgres-lab` |
   | (mismo `databases`) | crear `evolution-postgres` | `/databases/evolution-postgres` |
   | folder `infrastructure` | crear `cloudflared` | `/infrastructure/cloudflared` |
+  | folder `homelab` | crear `homepage` | `/homelab/homepage` |
+  | (mismo `homelab`) | crear `speedtest-tracker` | `/homelab/speedtest-tracker` |
 
   La notación con `/` (ej. `/automation/n8n`) se usa **solo** en el campo `secretsPath` del `InfisicalSecret` CR — ahí Infisical sí parsea la ruta nested.
 - [ ] **B4.** Crear **Machine Identity** `k8s-operator`:
@@ -194,7 +196,7 @@ Tras login admin en `https://infisical.oscargicast.com`:
 
 ---
 
-## Fase C — Migración de los 6 secretos (gradual)
+## Fase C — Migración de los 8 secretos (gradual)
 
 Orden (menos crítico → más crítico):
 
@@ -202,10 +204,12 @@ Orden (menos crítico → más crítico):
 |---|---|---|---|---|
 | 1 | `n8n-db-credentials` (automation) | `automation/n8n/sealed-secret.yaml` | `/automation/n8n` | Piloto |
 | 2 | `evolution-api-secrets` (automation) | `automation/evolution-api/sealed-secret.yaml` | `/automation/evolution-api` | Multi-key |
-| 3 | `n8n-db-user` (databases) | `databases/n8n-postgres/sealed-secret.yaml` | `/databases/n8n-postgres` | CNPG bootstrap |
-| 4 | `postgres-lab-app-user` (databases) | `databases/postgres-lab/sealed-secret.yaml` | `/databases/postgres-lab` | CNPG bootstrap |
-| 5 | `evolution-db-user` (databases) | `databases/evolution-postgres/sealed-secret.yaml` | `/databases/evolution-postgres` | CNPG bootstrap |
-| 6 | `cloudflared-token` (cloudflared) | `infrastructure/cloudflared/sealed-secret.yaml` | `/infrastructure/cloudflared` | **CRÍTICO** — si rompe, perdés acceso público |
+| 3 | `homepage-widget-secrets` (homelab) | `homelab/homepage/sealed-secret-widget-secrets.yaml` | `/homelab/homepage` | Key uppercase con `HOMEPAGE_VAR_` prefix |
+| 4 | `speedtest-tracker-secrets` (homelab) | `homelab/speedtest-tracker/sealed-secret.yaml` | `/homelab/speedtest-tracker` | Multi-key uppercase (`APP_KEY`, `PROMETHEUS_API_KEY`) |
+| 5 | `n8n-db-user` (databases) | `databases/n8n-postgres/sealed-secret.yaml` | `/databases/n8n-postgres` | CNPG bootstrap (`secretType: kubernetes.io/basic-auth`) |
+| 6 | `postgres-lab-app-user` (databases) | `databases/postgres-lab/sealed-secret.yaml` | `/databases/postgres-lab` | CNPG bootstrap (`secretType: kubernetes.io/basic-auth`) |
+| 7 | `evolution-db-user` (databases) | `databases/evolution-postgres/sealed-secret.yaml` | `/databases/evolution-postgres` | CNPG bootstrap (`secretType: kubernetes.io/basic-auth`) |
+| 8 | `cloudflared-token` (cloudflared) | `infrastructure/cloudflared/sealed-secret.yaml` | `/infrastructure/cloudflared` | **CRÍTICO** — si rompe, perdés acceso público |
 
 ### Patrón por secret
 
@@ -232,21 +236,30 @@ ssh macmini 'zsh -lc "kubectl -n automation get secret n8n-db-credentials -o jso
 ssh macmini 'zsh -lc "kubectl -n automation get secret evolution-api-secrets -o jsonpath={.data.api-key} | base64 -d"' | pbcopy
 ssh macmini 'zsh -lc "kubectl -n automation get secret evolution-api-secrets -o jsonpath={.data.database-url} | base64 -d"' | pbcopy
 
-# 3. n8n-db-user → folder /databases/n8n-postgres
+# 3. homepage-widget-secrets → folder /homelab/homepage
+ssh macmini 'zsh -lc "kubectl -n homelab get secret homepage-widget-secrets -o jsonpath={.data.HOMEPAGE_VAR_SPEEDTEST_KEY} | base64 -d"' | pbcopy
+
+# 4. speedtest-tracker-secrets → folder /homelab/speedtest-tracker
+ssh macmini 'zsh -lc "kubectl -n homelab get secret speedtest-tracker-secrets -o jsonpath={.data.APP_KEY} | base64 -d"' | pbcopy
+ssh macmini 'zsh -lc "kubectl -n homelab get secret speedtest-tracker-secrets -o jsonpath={.data.PROMETHEUS_API_KEY} | base64 -d"' | pbcopy
+
+# 5. n8n-db-user → folder /databases/n8n-postgres
 ssh macmini 'zsh -lc "kubectl -n databases get secret n8n-db-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
 ssh macmini 'zsh -lc "kubectl -n databases get secret n8n-db-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
 
-# 4. postgres-lab-app-user → folder /databases/postgres-lab
+# 6. postgres-lab-app-user → folder /databases/postgres-lab
 ssh macmini 'zsh -lc "kubectl -n databases get secret postgres-lab-app-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
 ssh macmini 'zsh -lc "kubectl -n databases get secret postgres-lab-app-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
 
-# 5. evolution-db-user → folder /databases/evolution-postgres
+# 7. evolution-db-user → folder /databases/evolution-postgres
 ssh macmini 'zsh -lc "kubectl -n databases get secret evolution-db-user -o jsonpath={.data.username} | base64 -d"' | pbcopy
 ssh macmini 'zsh -lc "kubectl -n databases get secret evolution-db-user -o jsonpath={.data.password} | base64 -d"' | pbcopy
 
-# 6. cloudflared-token → folder /infrastructure/cloudflared
+# 8. cloudflared-token → folder /infrastructure/cloudflared
 ssh macmini 'zsh -lc "kubectl -n cloudflared get secret cloudflared-token -o jsonpath={.data.token} | base64 -d"' | pbcopy
 ```
+
+> Las keys de Infisical deben coincidir **exactamente** con las del SealedSecret original (case-sensitive). Los secretos de `homelab` usan keys uppercase con underscores (`APP_KEY`, `PROMETHEUS_API_KEY`, `HOMEPAGE_VAR_SPEEDTEST_KEY`) — el deployment las consume directamente como env vars, así que el nombre tiene que respetarse al pegarlas en la UI.
 
 (Ver `docs/runbooks/secrets-cheatsheet.md` para la variante que imprime el valor en terminal en vez de copiarlo al clipboard.)
 
@@ -330,7 +343,7 @@ kubectl -n <ns> logs deploy/<workload> --tail=50    # sin errores de auth
 
 ---
 
-## Cleanup final (post-#6)
+## Cleanup final (post-#8)
 
 Solo después de verificar que `cloudflared` siga funcionando con el secret migrado:
 
