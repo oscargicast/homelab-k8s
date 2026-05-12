@@ -9,6 +9,10 @@ enableRbac: true
 env:
   HOMEPAGE_ALLOWED_HOSTS: "*"
 
+envFrom:
+  - secretRef:
+      name: homepage-widget-secrets
+
 serviceAccount:
   create: true
 
@@ -33,7 +37,7 @@ config:
       brightness: 50
       opacity: 60
     layout:
-      Monitoring:
+      Red:
         style: row
         columns: 1
       Cluster:
@@ -54,19 +58,17 @@ config:
   kubernetes:
     mode: cluster
   services:
-    - Monitoring:
-        - Histórico:
-            description: CPU / Memory / Disk / Network — últimas 24h
-            href: "https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring"
-            icon: grafana.png
+    - Red:
+        - Speedtest:
+            href: "https://speedtest.oscargicast.com/"
+            description: ISP throughput (download / upload / ping)
+            icon: speedtest-tracker.png
             widget:
-              type: iframe
-              name: Homelab Monitoring
-              src: https://grafana-internal.oscargicast.com/d/homelab-monitoring/homelab-monitoring?orgId=1&theme=dark&kiosk=tv&refresh=30s
-              classes: h-[480px] w-full
-              referrerPolicy: no-referrer
-              allowScrolling: "no"
-              loadingStrategy: lazy
+              type: speedtest
+              url: http://speedtest-tracker.homelab.svc.cluster.local
+              version: 2
+              key: "{{HOMEPAGE_VAR_SPEEDTEST_KEY}}"
+              bitratePrecision: 3
     - Cluster:
         - Overview:
             description: Estado general del cluster

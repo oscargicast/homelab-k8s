@@ -5,13 +5,6 @@ grafana:
     enabled: true
     storageClassName: local-path
     size: 2Gi
-  grafana.ini:
-    security:
-      allow_embedding: true
-    auth.anonymous:
-      enabled: true
-      org_role: Viewer
-      org_name: Main Org.
   resources:
     requests:
       memory: 128Mi

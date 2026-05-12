@@ -1,18 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: grafana-internal
-  namespace: observability
+  name: speedtest-tracker-internal
+  namespace: homelab
 spec:
   ingressClassName: traefik
   rules:
-    - host: grafana-internal.oscargicast.com
+    - host: speedtest.oscargicast.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: prometheus-grafana
+                name: speedtest-tracker
                 port:
                   number: 80

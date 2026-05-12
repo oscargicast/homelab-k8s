@@ -160,7 +160,6 @@ The cluster exposes services in two ways: **public via Cloudflare Tunnel** (n8n,
 | `homepage.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `argocd.oscargicast.com` | CNAME | `<TUNNEL_UUID>.cfargotunnel.com` | ☁️ Proxied | Tunnel Public Hostname |
 | `prometheus.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale IP is private) |
-| `grafana-internal.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale-only Grafana endpoint used by Homepage iframe) |
 | `speedtest.oscargicast.com` | CNAME | `oscar-mini-m1.tail90f0a7.ts.net` | ⚫ DNS only | Manual (must NOT be proxied — Tailscale-only speedtest-tracker UI/API) |
 
 ### Config-as-code trade-off
