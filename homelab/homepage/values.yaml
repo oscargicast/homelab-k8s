@@ -55,6 +55,9 @@ config:
       Red:
         style: row
         columns: 2
+      Tunnels & Tailnet:
+        style: row
+        columns: 2
       Personal:
         style: row
         columns: 1
@@ -85,6 +88,10 @@ config:
             href: "https://argocd.oscargicast.com"
             description: GitOps controller
             icon: argo-cd.png
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local
+              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
     - Automatización:
         - n8n:
             href: "https://n8n.oscargicast.com/"
@@ -169,9 +176,16 @@ config:
                   query: sum(prometheus_tsdb_storage_blocks_bytes)
                   format:
                     type: bytes
+        - Loki:
+            href: "https://grafana.oscargicast.com/explore"
+            description: Logs aggregation
+            icon: loki.png
+            widget:
+              type: loki
+              url: http://loki.observability.svc.cluster.local:3100
     - Databases:
         - n8n-postgres:
-            description: CNPG cluster (backing n8n)
+            description: "CNPG (backing n8n) • tailnet: n8n-postgres.tail90f0a7.ts.net:5432"
             href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
             icon: postgres.png
             widget:
@@ -190,7 +204,7 @@ config:
                     type: number
                     suffix: /s
         - evolution-postgres:
-            description: CNPG cluster (backing Evolution API)
+            description: "CNPG (backing Evolution) • tailnet: evolution-postgres.tail90f0a7.ts.net:5432"
             href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=evolution-postgres&var-namespace=databases"
             icon: postgres.png
             widget:
@@ -209,7 +223,7 @@ config:
                     type: number
                     suffix: /s
         - chapatuplaza:
-            description: CNPG cluster (chapatuplaza)
+            description: "CNPG • tailnet: chapatuplaza.tail90f0a7.ts.net:5432"
             href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=chapatuplaza&var-namespace=databases"
             icon: postgres.png
             widget:
@@ -275,6 +289,45 @@ config:
               version: 2
               key: "{{HOMEPAGE_VAR_SPEEDTEST_KEY}}"
               bitratePrecision: 3
+    - Tunnels & Tailnet:
+        - Tailscale Operator:
+            href: "https://login.tailscale.com/admin/machines"
+            description: K8s Operator + sidecars (devices en tailnet)
+            icon: tailscale.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Pods activos
+                  query: sum(kube_pod_status_phase{namespace="tailscale",phase="Running"})
+                - label: Sidecars ts-*
+                  query: count(kube_pod_info{namespace="tailscale",pod=~"ts-.*"})
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="tailscale"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="tailscale"}[5m]))
+                  format:
+                    type: percent
+        - Cloudflared:
+            href: "https://one.dash.cloudflare.com"
+            description: CF Tunnel (homelab-k8s)
+            icon: cloudflare.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Replicas activas
+                  query: sum(kube_pod_status_phase{namespace="cloudflared",pod=~"cloudflared-.*",phase="Running"})
+                - label: Memoria
+                  query: sum(container_memory_working_set_bytes{namespace="cloudflared",pod=~"cloudflared-.*"})
+                  format:
+                    type: bytes
+                - label: CPU
+                  query: sum(rate(container_cpu_usage_seconds_total{namespace="cloudflared",pod=~"cloudflared-.*"}[5m]))
+                  format:
+                    type: percent
     - Personal:
         - GitHub:
             href: "https://github.com/oscargicast"
