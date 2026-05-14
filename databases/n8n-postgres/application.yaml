@@ -12,7 +12,7 @@ spec:
     targetRevision: HEAD
     path: databases/n8n-postgres
     directory:
-      include: "{cluster.yaml,infisical-secret.yaml}"
+      include: "{cluster.yaml,infisical-secret.yaml,service-tailnet.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: databases

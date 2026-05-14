@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://pkgs.tailscale.com/helmcharts
+      chart: tailscale-operator
+      targetRevision: 1.96.5
+      helm:
+        values: |
+          oauth: {}
+          operatorConfig:
+            hostname: homelab-k8s-operator
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          proxyConfig:
+            defaultTags: "tag:k8s-db"
+          apiServerProxyConfig:
+            mode: "false"
+    - repoURL: https://github.com/oscargicast/homelab-k8s.git
+      targetRevision: HEAD
+      path: infrastructure/tailscale-operator
+      directory:
+        include: "{infisical-secret.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

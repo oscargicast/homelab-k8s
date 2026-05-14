@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolution-postgres-tailnet
+  namespace: databases
+  annotations:
+    tailscale.com/hostname: "evolution-postgres"
+    tailscale.com/tags: "tag:k8s-db"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    cnpg.io/cluster: evolution-postgres
+    role: primary
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

@@ -85,6 +85,7 @@ homelab-k8s/
 │   ├── cloudnative-pg/application.yaml # CNPG operator
 │   ├── traefik/application.yaml        # Traefik ingress controller
 │   ├── cloudflared/                    # CF Tunnel: deployment + InfisicalSecret + Application
+│   ├── tailscale-operator/             # Tailscale K8s Operator (expone Services al tailnet)
 │   └── argocd-config/                  # argocd-cm + argocd-rbac-cm + params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + InfisicalSecret
@@ -115,6 +116,7 @@ homelab-k8s/
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |
+| `tailscale` | Tailscale K8s Operator + sidecars `ts-*` (uno por Service expuesto al tailnet) |
 | `infisical` | Infisical backend (self-hosted) + dedicated Redis (in migration) |
 | `infisical-operator` | Infisical Secrets Operator (materializes Secrets from InfisicalSecret CRs) |
 | `automation` | n8n + evolution-api |
@@ -138,6 +140,7 @@ homelab-k8s/
 | Infisical (backend+UI) | `https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/` | `infisical-standalone` | `1.8.0` (image `v0.159.28`) |
 | Infisical Secrets Operator | `https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/` | `secrets-operator` | `0.10.33` |
 | Redis (for Infisical) | _(no Helm chart, manifest-based)_ | `redis` (official) | `8.6.3-alpine` |
+| Tailscale Operator | `https://pkgs.tailscale.com/helmcharts` | `tailscale-operator` | `1.96.5` |
 
 ## Architecture Constraints
 
@@ -208,6 +211,43 @@ Para n8n: configurar webhook URL como **DNS interno** (`http://n8n.automation.sv
 ### Pending
 
 - **Rotar el token de cloudflared**: el token original se compartió en chat durante el planning. Rotarlo desde `Networks → Tunnels → homelab-k8s → ⋯ → Refresh token`, pegar el nuevo valor en Infisical (`/infrastructure/cloudflared`, key `token`). El operator re-sincroniza el `Secret` en ≤60s; basta con `kubectl rollout restart deploy/cloudflared -n cloudflared` para que tome el token nuevo. Sin commits.
+
+## Tailnet exposure (Tailscale K8s Operator)
+
+Servicios internos del cluster que necesitan ser alcanzables desde devices del tailnet (la MacBook, otros nodos) se exponen vía el **Tailscale Operator** en el namespace `tailscale`. Patrón:
+
+- El operator corre como Deployment en `tailscale`, autenticado vía OAuth client (credenciales en Infisical, materializadas como Secret `operator-oauth` con keys `client_id` + `client_secret`).
+- Cada Service con `spec.type: LoadBalancer` + `spec.loadBalancerClass: tailscale` dispara la creación automática de un sidecar `tailscaled` (pod `ts-<service>` en el namespace `tailscale`) que se une al tailnet como un device propio.
+- Anotaciones por Service: `tailscale.com/hostname: <name>` (MagicDNS → `<name>.tail90f0a7.ts.net`) y `tailscale.com/tags: tag:k8s-db` (para ACL).
+- **Apps in-cluster siguen sin tocar Tailscale** — usan la ClusterIP/DNS interna del CNPG (`<cluster>-rw.databases.svc.cluster.local:5432`). El operator solo añade un camino paralelo desde el tailnet.
+
+### Servicios expuestos actualmente
+
+| Service tailnet | DB backend | Hostname tailnet |
+|---|---|---|
+| `chapatuplaza-tailnet` | `chapatuplaza` CNPG primary | `chapatuplaza.tail90f0a7.ts.net:5432` |
+| `n8n-postgres-tailnet` | `n8n-postgres` CNPG primary | `n8n-postgres.tail90f0a7.ts.net:5432` |
+| `evolution-postgres-tailnet` | `evolution-postgres` CNPG primary | `evolution-postgres.tail90f0a7.ts.net:5432` |
+
+### Pre-requisitos manuales en Tailscale (no GitOps)
+
+- **OAuth client** en Tailscale: `https://login.tailscale.com/admin/settings/trust-credentials/add` (Tailscale movió "OAuth clients" a la sección "Trust credentials"). Scopes write: `Devices Core`, `Auth Keys`, `Services`. Tag asignado al client: `tag:k8s-operator`.
+- **ACL** (sintaxis `grants` moderna, no `acls` legacy) debe definir `tagOwners`:
+  ```jsonc
+  "tagOwners": {
+    "tag:k8s-operator": [],
+    "tag:k8s-db":       ["tag:k8s-operator"]
+  }
+  ```
+- Si tu tailnet ya tiene el grant default `{"src": ["*"], "dst": ["*"], "ip": ["*"]}`, los DBs son alcanzables sin reglas extra. Para endurecer (recomendado a futuro), sustituirlo por grants explícitos: `{"src":["oscar.gi.cast@gmail.com"],"dst":["tag:k8s-db"],"ip":["tcp:5432"]}`.
+
+### Selector de CNPG
+
+El Service tailnet selecciona el primario por `cnpg.io/cluster: <name>` + `role: primary`. CNPG mantiene la label `role: primary` en el pod activo durante failovers (relevante si en el futuro se escala a multi-réplica). Para exponer también réplicas, replicar el Service con `role: replica`.
+
+### Rotación del OAuth client
+
+Generar uno nuevo en Tailscale, actualizar Infisical (`/infrastructure/tailscale-operator`, keys `client_id` + `client_secret`), `kubectl rollout restart deploy/operator -n tailscale`. Sin commits.
 
 ## Chart-specific gotchas
 
