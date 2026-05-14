@@ -88,9 +88,9 @@ homelab-k8s/
 │   ├── tailscale-operator/             # Tailscale K8s Operator (expone Services al tailnet)
 │   └── argocd-config/                  # argocd-cm + argocd-rbac-cm + params-cm overrides
 ├── databases/
-│   ├── postgres-lab/                   # CNPG Cluster + InfisicalSecret
-│   ├── n8n-postgres/                   # CNPG Cluster + InfisicalSecret
-│   ├── evolution-postgres/             # CNPG Cluster + InfisicalSecret (Evolution API)
+│   ├── chapatuplaza/                   # CNPG Cluster + InfisicalSecret + Service tailnet
+│   ├── n8n-postgres/                   # CNPG Cluster + InfisicalSecret + Service tailnet
+│   ├── evolution-postgres/             # CNPG Cluster + InfisicalSecret + Service tailnet (Evolution API)
 │   └── infisical-postgres/             # CNPG Cluster (Infisical backend DB)
 ├── observability/
 │   ├── prometheus/                     # kube-prometheus-stack + values + ingresses
@@ -112,7 +112,7 @@ homelab-k8s/
 | `argocd` | Argo CD (GitOps controller) |
 | `kube-system` | Sealed Secrets operator (legacy, sin CRs vivos) |
 | `cnpg-system` | CloudNativePG operator |
-| `databases` | PostgreSQL clusters (postgres-lab, n8n-postgres, evolution-postgres, infisical-postgres) |
+| `databases` | PostgreSQL clusters (chapatuplaza, n8n-postgres, evolution-postgres, infisical-postgres) |
 | `observability` | Prometheus, Grafana, Loki |
 | `traefik` | Traefik ingress controller |
 | `cloudflared` | Cloudflare Tunnel connector (cloudflared Deployment) |

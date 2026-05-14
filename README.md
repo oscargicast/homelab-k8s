@@ -16,10 +16,11 @@ graph TD
     K8S --> NS_INF_OP["infisical-operator<br/><i>Infisical Secrets Operator</i>"]
     K8S --> NS_INF["infisical<br/><i>Infisical backend + Redis</i>"]
     K8S --> NS_CNPG["cnpg-system<br/><i>CloudNativePG operator</i>"]
-    K8S --> NS_DB["databases<br/><i>postgres-lab + n8n-postgres + evolution-postgres + infisical-postgres</i>"]
+    K8S --> NS_DB["databases<br/><i>chapatuplaza + n8n-postgres + evolution-postgres + infisical-postgres</i>"]
     K8S --> NS_OBS["observability<br/><i>Prometheus + Grafana + Loki</i>"]
     K8S --> NS_TRA["traefik<br/><i>Ingress controller por Host</i>"]
     K8S --> NS_CFD["cloudflared<br/><i>Cloudflare Tunnel connector</i>"]
+    K8S --> NS_TS["tailscale<br/><i>Tailscale K8s Operator + sidecars ts-*</i>"]
     K8S --> NS_AUT["automation<br/><i>n8n + evolution-api</i>"]
     K8S --> NS_HL["homelab<br/><i>Homepage + Speedtest Tracker</i>"]
 ```
@@ -47,6 +48,8 @@ graph LR
         ARGO["argocd-server.argocd:80"]
         PROM["prometheus...:9090"]
         SPD["speedtest-tracker.homelab:80"]
+        TS["Tailscale Operator<br/>+ sidecars ts-*"]
+        DBS["CNPG primary<br/>(chapatuplaza, n8n-postgres,<br/>evolution-postgres)"]
     end
 
     USR_EXT -->|n8n.oscargicast.com| EDGE
@@ -68,6 +71,9 @@ graph LR
     PF8080 --> TRA
     TRA --> PROM
     TRA --> SPD
+
+    USR_INT -->|chapatuplaza/n8n-postgres/<br/>evolution-postgres .tail90f0a7.ts.net:5432<br/>MagicDNS| TS
+    TS --> DBS
 ```
 
 ## Cómo funciona el GitOps
@@ -93,7 +99,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | Infisical Secrets Operator | Materializa `InfisicalSecret` CRs → Secrets nativos | `infisical-operator` |
 | Sealed Secrets | Credenciales encriptadas en Git (legacy, en migración a Infisical) | `kube-system` |
 | CloudNativePG | Operador PostgreSQL | `cnpg-system` |
-| postgres-lab | PostgreSQL de pruebas | `databases` |
+| chapatuplaza | PostgreSQL de pruebas / propósito general | `databases` |
 | n8n-postgres | PostgreSQL dedicado para n8n | `databases` |
 | evolution-postgres | PostgreSQL dedicado para Evolution API | `databases` |
 | infisical-postgres | PostgreSQL dedicado para Infisical backend | `databases` |
@@ -101,6 +107,7 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | Loki | Logs centralizados | `observability` |
 | Traefik | Ingress controller (routing por Host) | `traefik` |
 | cloudflared | Cloudflare Tunnel connector (saliente) | `cloudflared` |
+| Tailscale Operator | Expone Services al tailnet vía `loadBalancerClass: tailscale` (un sidecar `tailscaled` por Service) | `tailscale` |
 | n8n | Automatización de workflows | `automation` |
 | Evolution API | API de WhatsApp Web (integración con n8n) | `automation` |
 | Homepage | Dashboard visual del homelab | `homelab` |
@@ -124,11 +131,12 @@ homelab-k8s/
 │   ├── cloudnative-pg/                 # CNPG operator
 │   ├── traefik/                        # Traefik ingress controller
 │   ├── cloudflared/                    # CF Tunnel: deployment + infisical-secret + Application
+│   ├── tailscale-operator/             # Tailscale K8s Operator (chart + infisical-secret)
 │   └── argocd-config/                  # argocd-cmd-params-cm overrides
 ├── databases/
-│   ├── postgres-lab/                   # cluster.yaml + infisical-secret.yaml
-│   ├── n8n-postgres/
-│   ├── evolution-postgres/             # CNPG cluster para Evolution API
+│   ├── chapatuplaza/                   # CNPG cluster + service-tailnet.yaml
+│   ├── n8n-postgres/                   # CNPG cluster + service-tailnet.yaml
+│   ├── evolution-postgres/             # CNPG cluster + service-tailnet.yaml (Evolution API)
 │   └── infisical-postgres/             # CNPG cluster para Infisical backend
 ├── observability/
 │   ├── prometheus/                     # values.yaml + ingresses (grafana, prometheus)
@@ -177,8 +185,13 @@ kubectl apply -f bootstrap/argocd/root-app.yaml
 | Argo CD | `https://argocd.oscargicast.com` | Público + Cloudflare Access (+ admin password de Argo CD) |
 | Prometheus | `http://prometheus.oscargicast.com:8080` | Solo tailnet (CNAME→Tailscale) |
 | Speedtest Tracker | `https://speedtest.oscargicast.com` | Solo tailnet (CNAME→Tailscale) |
+| chapatuplaza (Postgres) | `chapatuplaza.tail90f0a7.ts.net:5432` | Solo tailnet (Tailscale Operator) |
+| n8n-postgres (Postgres) | `n8n-postgres.tail90f0a7.ts.net:5432` | Solo tailnet (Tailscale Operator) |
+| evolution-postgres (Postgres) | `evolution-postgres.tail90f0a7.ts.net:5432` | Solo tailnet (Tailscale Operator) |
 
 Los públicos pasan por **Cloudflare Tunnel** (cloudflared corriendo en cluster con conexión saliente a CF edge), TLS terminado en CF, sin abrir puertos en la red.
+
+Las DBs Postgres se exponen al tailnet vía el **Tailscale K8s Operator**: cada Service con `loadBalancerClass: tailscale` se materializa como un sidecar `tailscaled` con su propio hostname MagicDNS. Auth de aplicación = usuario/password CNPG (Secret materializado por Infisical); auth de red = ACL de Tailscale (`tag:k8s-db`). Apps in-cluster siguen llamando por DNS interno (`<cluster>-rw.databases.svc.cluster.local:5432`) sin pasar por Tailscale. Detalles en [`CLAUDE.md` § Tailnet exposure](CLAUDE.md#tailnet-exposure-tailscale-k8s-operator).
 
 Para Prometheus (interno por tailnet) hay que tener corriendo el port-forward de Traefik en Mac mini:
 
