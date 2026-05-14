@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-lab
+  name: chapatuplaza
   namespace: databases
 spec:
   instances: 1
@@ -11,10 +11,10 @@ spec:
     storageClass: local-path
   bootstrap:
     initdb:
-      database: app
-      owner: app
+      database: chapatuplaza
+      owner: chapatuplaza
       secret:
-        name: postgres-lab-app-user
+        name: chapatuplaza-db-user
   resources:
     requests:
       memory: 256Mi

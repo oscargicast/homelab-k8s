@@ -170,25 +170,6 @@ config:
                   format:
                     type: bytes
     - Databases:
-        - postgres-lab:
-            description: CNPG cluster general purpose
-            href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=postgres-lab&var-namespace=databases"
-            icon: postgres.png
-            widget:
-              type: prometheusmetric
-              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
-              metrics:
-                - label: Connections
-                  query: sum(cnpg_backends_total{namespace="databases",pod=~"postgres-lab-.*"})
-                - label: DB size
-                  query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"postgres-lab-.*"})
-                  format:
-                    type: bytes
-                - label: TPS
-                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"postgres-lab-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"postgres-lab-.*"}[5m]))
-                  format:
-                    type: number
-                    suffix: /s
         - n8n-postgres:
             description: CNPG cluster (backing n8n)
             href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=n8n-postgres&var-namespace=databases"
@@ -224,6 +205,25 @@ config:
                     type: bytes
                 - label: TPS
                   query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"evolution-postgres-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"evolution-postgres-.*"}[5m]))
+                  format:
+                    type: number
+                    suffix: /s
+        - chapatuplaza:
+            description: CNPG cluster (chapatuplaza)
+            href: "https://grafana.oscargicast.com/d/cloudnative-pg/cloudnativepg?var-cluster=chapatuplaza&var-namespace=databases"
+            icon: postgres.png
+            widget:
+              type: prometheusmetric
+              url: http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090
+              metrics:
+                - label: Connections
+                  query: sum(cnpg_backends_total{namespace="databases",pod=~"chapatuplaza-.*"})
+                - label: DB size
+                  query: sum(cnpg_pg_database_size_bytes{namespace="databases",pod=~"chapatuplaza-.*"})
+                  format:
+                    type: bytes
+                - label: TPS
+                  query: sum(rate(cnpg_pg_stat_database_xact_commit{namespace="databases",pod=~"chapatuplaza-.*"}[5m])) + sum(rate(cnpg_pg_stat_database_xact_rollback{namespace="databases",pod=~"chapatuplaza-.*"}[5m]))
                   format:
                     type: number
                     suffix: /s

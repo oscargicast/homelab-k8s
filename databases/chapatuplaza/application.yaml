@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: postgres-lab
+  name: chapatuplaza
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/oscargicast/homelab-k8s.git
     targetRevision: HEAD
-    path: databases/postgres-lab
+    path: databases/chapatuplaza
     directory:
       include: "{cluster.yaml,infisical-secret.yaml}"
   destination:
