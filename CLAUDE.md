@@ -85,7 +85,7 @@ homelab-k8s/
 │   ├── cloudnative-pg/application.yaml # CNPG operator
 │   ├── traefik/application.yaml        # Traefik ingress controller
 │   ├── cloudflared/                    # CF Tunnel: deployment + InfisicalSecret + Application
-│   └── argocd-config/params-cm.yaml    # argocd-cmd-params-cm overrides
+│   └── argocd-config/                  # argocd-cm + argocd-rbac-cm + params-cm overrides
 ├── databases/
 │   ├── postgres-lab/                   # CNPG Cluster + InfisicalSecret
 │   ├── n8n-postgres/                   # CNPG Cluster + InfisicalSecret
@@ -294,5 +294,7 @@ Auth flow: CF Access (Google email) → Argo CD login (`admin` + initial passwor
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d
 ```
+
+Además del usuario `admin`, hay una cuenta local `oscargicast` con rol `admin` definida en `infrastructure/argocd-config/argocd-cm.yaml` + `argocd-rbac-cm.yaml`. Habilita login web + tokens para CLI sin compartir el password de admin. Setear su password inicial con `argocd account update-password --account oscargicast`.
 
 > Si necesitás acceso de emergencia con el tunnel caído, el fallback temporal es `kubectl port-forward -n argocd svc/argocd-server --address 0.0.0.0 8443:80` (notar `80`, no `443`, porque ahora corre en `--insecure` mode) y abrir `http://<tailscale-ip>:8443`. Usar solo en emergencia.

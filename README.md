@@ -6,47 +6,47 @@ Laboratorio Kubernetes personal corriendo en una **Mac mini M1 headless**, gesti
 
 ```mermaid
 graph TD
-    MBP[MacBook Pro]
-    MBP -->|SSH via Tailscale| MM[Mac mini M1]
-    MM --> COL[Colima VM]
-    COL --> K8S[K3s en Kubernetes]
+    MBP["MacBook Pro"]
+    MBP -->|SSH via Tailscale| MM["Mac mini M1"]
+    MM --> COL["Colima VM"]
+    COL --> K8S["K3s en Kubernetes"]
 
-    K8S --> NS_ARGOCD[argocd<br/><i>Argo CD GitOps</i>]
-    K8S --> NS_KS[kube-system<br/><i>Sealed Secrets operator (legacy, sin CRs)</i>]
-    K8S --> NS_INF_OP[infisical-operator<br/><i>Infisical Secrets Operator</i>]
-    K8S --> NS_INF[infisical<br/><i>Infisical backend + Redis</i>]
-    K8S --> NS_CNPG[cnpg-system<br/><i>CloudNativePG operator</i>]
-    K8S --> NS_DB[databases<br/><i>postgres-lab + n8n-postgres + evolution-postgres + infisical-postgres</i>]
-    K8S --> NS_OBS[observability<br/><i>Prometheus + Grafana + Loki</i>]
-    K8S --> NS_TRA[traefik<br/><i>Ingress controller por Host</i>]
-    K8S --> NS_CFD[cloudflared<br/><i>Cloudflare Tunnel connector</i>]
-    K8S --> NS_AUT[automation<br/><i>n8n + evolution-api</i>]
-    K8S --> NS_HL[homelab<br/><i>Homepage + Speedtest Tracker</i>]
+    K8S --> NS_ARGOCD["argocd<br/><i>Argo CD GitOps</i>"]
+    K8S --> NS_KS["kube-system<br/><i>Sealed Secrets operator (legacy, sin CRs)</i>"]
+    K8S --> NS_INF_OP["infisical-operator<br/><i>Infisical Secrets Operator</i>"]
+    K8S --> NS_INF["infisical<br/><i>Infisical backend + Redis</i>"]
+    K8S --> NS_CNPG["cnpg-system<br/><i>CloudNativePG operator</i>"]
+    K8S --> NS_DB["databases<br/><i>postgres-lab + n8n-postgres + evolution-postgres + infisical-postgres</i>"]
+    K8S --> NS_OBS["observability<br/><i>Prometheus + Grafana + Loki</i>"]
+    K8S --> NS_TRA["traefik<br/><i>Ingress controller por Host</i>"]
+    K8S --> NS_CFD["cloudflared<br/><i>Cloudflare Tunnel connector</i>"]
+    K8S --> NS_AUT["automation<br/><i>n8n + evolution-api</i>"]
+    K8S --> NS_HL["homelab<br/><i>Homepage + Speedtest Tracker</i>"]
 ```
 
 ## Cómo se accede a cada servicio
 
 ```mermaid
 graph LR
-    USR_EXT[👤 Usuario en internet]
-    USR_INT[👤 Usuario en tailnet]
+    USR_EXT["👤 Usuario en internet"]
+    USR_INT["👤 Usuario en tailnet"]
 
-    subgraph CF[Cloudflare]
-        EDGE[Edge<br/>TLS + Access]
-        TUNNEL[Tunnel]
+    subgraph CF["Cloudflare"]
+        EDGE["Edge<br/>TLS + Access"]
+        TUNNEL["Tunnel"]
     end
 
-    subgraph CLUSTER[Cluster Mac mini]
-        CFD[cloudflared pod<br/>2 réplicas]
-        TRA[Traefik svc:80]
-        PF8080[Mac mini host :8080<br/>kubectl port-forward]
-        N8N[n8n.automation:80]
-        EVO[evolution-api hostNetwork :8085]
-        GRA[prometheus-grafana.observability:80]
-        HOM[homepage.homelab:3000]
-        ARGO[argocd-server.argocd:80]
-        PROM[prometheus...:9090]
-        SPD[speedtest-tracker.homelab:80]
+    subgraph CLUSTER["Cluster Mac mini"]
+        CFD["cloudflared pod<br/>2 réplicas"]
+        TRA["Traefik svc:80"]
+        PF8080["Mac mini host :8080<br/>kubectl port-forward"]
+        N8N["n8n.automation:80"]
+        EVO["evolution-api hostNetwork :8085"]
+        GRA["prometheus-grafana.observability:80"]
+        HOM["homepage.homelab:3000"]
+        ARGO["argocd-server.argocd:80"]
+        PROM["prometheus...:9090"]
+        SPD["speedtest-tracker.homelab:80"]
     end
 
     USR_EXT -->|n8n.oscargicast.com| EDGE
